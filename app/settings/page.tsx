@@ -628,7 +628,7 @@ function SettingsContent() {
                                     className="p-1.5 hover:bg-muted rounded transition-colors disabled:opacity-50"
                                     title="Delete"
                                   >
-                                    <Trash2 className="w-4 h-4 text-muted-foreground" />
+                                    <Trash2 className="w-4 h-4 text-red-500" />
                                   </button>
                                 </div>
                               </td>
@@ -751,7 +751,7 @@ function SettingsContent() {
                                     className="p-1.5 hover:bg-muted rounded transition-colors disabled:opacity-50"
                                     title="Delete"
                                   >
-                                    <Trash2 className="w-4 h-4 text-muted-foreground" />
+                                    <Trash2 className="w-4 h-4 text-red-500" />
                                   </button>
                                 </div>
                               </td>

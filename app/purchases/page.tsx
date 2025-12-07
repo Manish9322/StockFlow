@@ -1,53 +1,156 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo, useEffect } from "react"
 import MainLayout from "@/components/layout/main-layout"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useLanguage } from "@/lib/language-context"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { Download } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Download, Eye, Pencil, Trash2 } from "lucide-react"
+import { toast } from "sonner"
 
-// Sample purchase history data
-const samplePurchases = [
-  {
-    id: "PUR-001",
-    date: "2024-11-26",
-    product: "Laptop Computer",
-    quantity: 5,
-    amount: 4495,
-    status: "Completed",
-  },
-  {
-    id: "PUR-002",
-    date: "2024-11-25",
-    product: "Wireless Mouse",
-    quantity: 20,
-    amount: 249.8,
-    status: "Completed",
-  },
-  {
-    id: "PUR-003",
-    date: "2024-11-24",
-    product: "USB-C Cable",
-    quantity: 50,
-    amount: 99.5,
-    status: "Pending",
-  },
-]
+interface PurchaseItem {
+  product: any
+  productName: string
+  productSku: string
+  quantity: number
+  unitPrice: number
+  subtotal: number
+}
+
+interface Purchase {
+  _id: string
+  purchaseId: string
+  date: string
+  items: PurchaseItem[]
+  totalAmount: number
+  status: string
+  supplier: string
+  paymentMethod: string
+  notes?: string
+}
 
 function PurchasesContent() {
   const { t } = useLanguage()
-  const [purchases] = useState(samplePurchases)
+  const [purchases, setPurchases] = useState<Purchase[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null)
+  const [showViewModal, setShowViewModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [purchaseToDelete, setPurchaseToDelete] = useState<string | null>(null)
+  const [editFormData, setEditFormData] = useState<any>({})
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(5)
+  
+  // Advanced filter state
+  const [showFilters, setShowFilters] = useState(false)
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [dateFrom, setDateFrom] = useState("")
+  const [dateTo, setDateTo] = useState("")
+
+  // Fetch purchases on mount
+  useEffect(() => {
+    fetchPurchases()
+  }, [])
+
+  const fetchPurchases = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch("/api/purchase")
+      const data = await response.json()
+      
+      if (data.success) {
+        setPurchases(data.data)
+      } else {
+        toast.error("Failed to fetch purchases")
+      }
+    } catch (error) {
+      console.error("Error fetching purchases:", error)
+      toast.error("Failed to fetch purchases")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Filter purchases based on search query and advanced filters
+  const filteredPurchases = useMemo(() => {
+    let filtered = purchases
+    
+    // Search filter
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(
+        (purchase) =>
+          purchase.purchaseId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          purchase.items.some(item => item.productName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+          purchase.supplier.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          purchase.status.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    }
+    
+    // Status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(purchase => purchase.status.toLowerCase() === statusFilter.toLowerCase())
+    }
+    
+    // Date range filter
+    if (dateFrom) {
+      filtered = filtered.filter(purchase => new Date(purchase.date).toISOString().split('T')[0] >= dateFrom)
+    }
+    if (dateTo) {
+      filtered = filtered.filter(purchase => new Date(purchase.date).toISOString().split('T')[0] <= dateTo)
+    }
+    
+    return filtered
+  }, [searchQuery, purchases, statusFilter, dateFrom, dateTo])
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredPurchases.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedPurchases = filteredPurchases.slice(startIndex, endIndex)
+
+  // Reset to page 1 when filters change
+  useMemo(() => {
+    setCurrentPage(1)
+  }, [searchQuery, statusFilter, dateFrom, dateTo])
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
+
+  const handleItemsPerPageChange = (value: number) => {
+    setItemsPerPage(value)
+    setCurrentPage(1)
+  }
 
   const handleExportCSV = (format: "csv" | "excel" | "pdf") => {
     let content = ""
 
     if (format === "csv") {
-      content = [
-        ["Purchase ID", "Date", "Product", "Quantity", "Amount (₹)", "Status"].join(","),
-        ...purchases.map((p) => [p.id, p.date, p.product, p.quantity, p.amount, p.status].join(",")),
-      ].join("\n")
+      // CSV header
+      const headers = ["Purchase ID", "Date", "Products", "Total Items", "Amount (₹)", "Status", "Supplier", "Payment Method"]
+      
+      // CSV rows
+      const rows = purchases.map((p) => {
+        const productsStr = p.items.map(item => `${item.productName} (${item.quantity})`).join("; ")
+        const totalItems = p.items.reduce((sum, item) => sum + item.quantity, 0)
+        return [
+          p.purchaseId,
+          new Date(p.date).toLocaleDateString(),
+          `"${productsStr}"`,
+          totalItems,
+          p.totalAmount,
+          p.status,
+          p.supplier,
+          p.paymentMethod
+        ].join(",")
+      })
+      
+      content = [headers.join(","), ...rows].join("\n")
 
       const blob = new Blob([content], { type: "text/csv" })
       const url = window.URL.createObjectURL(blob)
@@ -56,88 +159,610 @@ function PurchasesContent() {
       a.download = `purchases-${new Date().toISOString().split("T")[0]}.csv`
       a.click()
       window.URL.revokeObjectURL(url)
+      toast.success("CSV exported successfully")
     } else {
-      alert(`${format.toUpperCase()} export coming soon!`)
+      toast.info(`${format.toUpperCase()} export coming soon!`)
+    }
+  }
+
+  const openViewModal = (purchase: Purchase) => {
+    setSelectedPurchase(purchase)
+    setShowViewModal(true)
+  }
+
+  const openEditModal = (purchase: Purchase) => {
+    setSelectedPurchase(purchase)
+    setEditFormData({
+      date: new Date(purchase.date).toISOString().split('T')[0],
+      status: purchase.status,
+      supplier: purchase.supplier,
+      paymentMethod: purchase.paymentMethod,
+      notes: purchase.notes || "",
+    })
+    setShowEditModal(true)
+  }
+
+  const handleUpdatePurchase = async () => {
+    if (!selectedPurchase) return
+    
+    try {
+      const response = await fetch(`/api/purchase/${selectedPurchase._id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(editFormData),
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        toast.success("Purchase updated successfully")
+        fetchPurchases()
+        setShowEditModal(false)
+        setSelectedPurchase(null)
+      } else {
+        toast.error(data.error || "Failed to update purchase")
+      }
+    } catch (error) {
+      console.error("Error updating purchase:", error)
+      toast.error("Failed to update purchase")
+    }
+  }
+
+  const handleDeletePurchase = (id: string) => {
+    setPurchaseToDelete(id)
+    setShowDeleteModal(true)
+  }
+
+  const confirmDelete = async () => {
+    if (purchaseToDelete) {
+      try {
+        const response = await fetch(`/api/purchase/${purchaseToDelete}`, {
+          method: "DELETE",
+        })
+        
+        const data = await response.json()
+        
+        if (data.success) {
+          toast.success("Purchase deleted successfully")
+          fetchPurchases()
+        } else {
+          toast.error(data.error || "Failed to delete purchase")
+        }
+      } catch (error) {
+        console.error("Error deleting purchase:", error)
+        toast.error("Failed to delete purchase")
+      } finally {
+        setShowDeleteModal(false)
+        setPurchaseToDelete(null)
+      }
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "completed":
+        return "bg-primary/10 text-primary"
+      case "pending":
+        return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+      case "cancelled":
+        return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+      default:
+        return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
     }
   }
 
   return (
     <MainLayout>
-      <div className="p-4 md:p-8 space-y-6 md:space-y-8">
-        <div>
+      <div className="p-4 md:p-8">
+        <div className="mb-6 md:mb-8">
           <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">{t("purchases.title")}</h1>
           <p className="text-sm md:text-base text-muted-foreground">
             View all purchase orders with detailed history, filtering options, and export capabilities
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-2 justify-end">
-          <Button
-            onClick={() => handleExportCSV("csv")}
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2 bg-transparent"
-          >
-            <Download size={14} />
-            {t("purchases.export_csv")}
-          </Button>
-          <Button
-            onClick={() => handleExportCSV("excel")}
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2 bg-transparent"
-          >
-            <Download size={14} />
-            {t("purchases.export_excel")}
-          </Button>
-          <Button
-            onClick={() => handleExportCSV("pdf")}
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2 bg-transparent"
-          >
-            <Download size={14} />
-            {t("purchases.export_pdf")}
-          </Button>
-        </div>
-
-        <div className="bg-card border border-border rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs md:text-sm">{t("purchases.date")}</TableHead>
-                  <TableHead className="text-xs md:text-sm">{t("purchases.product")}</TableHead>
-                  <TableHead className="text-xs md:text-sm text-right">{t("purchases.quantity")}</TableHead>
-                  <TableHead className="text-xs md:text-sm text-right">{t("purchases.amount")}</TableHead>
-                  <TableHead className="text-xs md:text-sm">{t("purchases.status")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {purchases.map((purchase) => (
-                  <TableRow key={purchase.id}>
-                    <TableCell className="text-xs md:text-sm font-mono">{purchase.date}</TableCell>
-                    <TableCell className="text-xs md:text-sm">{purchase.product}</TableCell>
-                    <TableCell className="text-xs md:text-sm text-right">{purchase.quantity}</TableCell>
-                    <TableCell className="text-xs md:text-sm text-right">₹{purchase.amount}</TableCell>
-                    <TableCell className="text-xs md:text-sm">
-                      <span
-                        className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                          purchase.status === "Completed"
-                            ? "bg-green-50 text-green-700"
-                            : "bg-yellow-50 text-yellow-700"
-                        }`}
-                      >
-                        {purchase.status}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+        <div className="bg-card border border-border rounded-lg p-6 space-y-6">
+          {/* Header with Search and Export Buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Input
+                type="text"
+                placeholder="Search purchases..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="max-w-sm"
+              />
+              <Button
+                onClick={() => setShowFilters(!showFilters)}
+                variant="outline"
+                size="sm"
+                className="whitespace-nowrap"
+              >
+                {showFilters ? "Hide Filters" : "Advanced Filters"}
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => handleExportCSV("csv")}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 bg-transparent"
+              >
+                <Download className="w-4 h-4" />
+                CSV
+              </Button>
+              <Button
+                onClick={() => handleExportCSV("excel")}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 bg-transparent"
+              >
+                <Download className="w-4 h-4" />
+                Excel
+              </Button>
+              <Button
+                onClick={() => handleExportCSV("pdf")}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 bg-transparent"
+              >
+                <Download className="w-4 h-4" />
+                PDF
+              </Button>
+            </div>
           </div>
+
+          {/* Advanced Filters */}
+          {showFilters && (
+            <div className="border border-border rounded-lg p-4 bg-muted/30">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">Status</label>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="completed">Completed</option>
+                    <option value="pending">Pending</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">Date From</label>
+                  <Input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">Date To</label>
+                  <Input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 mt-4">
+                <Button
+                  onClick={() => {
+                    setStatusFilter("all")
+                    setDateFrom("")
+                    setDateTo("")
+                  }}
+                  variant="outline"
+                  size="sm"
+                >
+                  Clear Filters
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Purchases Table */}
+          {loading ? (
+            <div className="text-center py-12">
+              <p className="text-sm text-muted-foreground">Loading purchases...</p>
+            </div>
+          ) : filteredPurchases.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-sm text-muted-foreground">
+                {searchQuery ? "No purchases found matching your search." : "No purchases yet."}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="border border-border rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="text-left px-4 py-3 text-sm font-medium text-foreground">Purchase ID</th>
+                        <th className="text-left px-4 py-3 text-sm font-medium text-foreground">Date</th>
+                        <th className="text-left px-4 py-3 text-sm font-medium text-foreground">Products</th>
+                      <th className="text-left px-4 py-3 text-sm font-medium text-foreground">Supplier</th>
+                      <th className="text-right px-4 py-3 text-sm font-medium text-foreground">Total Items</th>
+                      <th className="text-right px-4 py-3 text-sm font-medium text-foreground">Amount</th>
+                      <th className="text-left px-4 py-3 text-sm font-medium text-foreground">Status</th>
+                      <th className="text-right px-4 py-3 text-sm font-medium text-foreground">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {paginatedPurchases.map((purchase) => (
+                      <tr key={purchase._id} className="hover:bg-muted/50 transition-colors">
+                        <td className="px-4 py-3 text-sm text-foreground font-medium">{purchase.purchaseId}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{new Date(purchase.date).toLocaleDateString()}</td>
+                        <td className="px-4 py-3 text-sm text-foreground">
+                          <div className="max-w-[200px]">
+                            {purchase.items.length === 1 ? (
+                              <span className="font-medium">{purchase.items[0].productName}</span>
+                            ) : (
+                              <span className="text-muted-foreground">{purchase.items.length} items</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{purchase.supplier}</td>
+                        <td className="px-4 py-3 text-sm text-foreground text-right">
+                          {purchase.items.reduce((sum, item) => sum + item.quantity, 0)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-foreground text-right">₹{purchase.totalAmount.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-sm">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(purchase.status)}`}
+                          >
+                            {purchase.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => openViewModal(purchase)}
+                              className="p-1.5 hover:bg-muted rounded transition-colors"
+                              title="View"
+                            >
+                              <Eye className="w-4 h-4 text-muted-foreground" />
+                            </button>
+                            <button
+                              onClick={() => openEditModal(purchase)}
+                              className="p-1.5 hover:bg-muted rounded transition-colors"
+                              title="Edit"
+                            >
+                              <Pencil className="w-4 h-4 text-muted-foreground" />
+                            </button>
+                            <button
+                              onClick={() => handleDeletePurchase(purchase._id)}
+                              className="p-1.5 hover:bg-muted rounded transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4">
+              {/* Items per page selector */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Show</span>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
+                  className="px-3 py-1.5 rounded-md border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+                <span className="text-sm text-muted-foreground">
+                  entries (Showing {startIndex + 1}-{Math.min(endIndex, filteredPurchases.length)} of {filteredPurchases.length})
+                </span>
+              </div>
+
+              {/* Page navigation */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(1)}
+                  disabled={currentPage === 1}
+                  className="px-3"
+                >
+                  First
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-3"
+                >
+                  Previous
+                </Button>
+                
+                {/* Page numbers */}
+                <div className="flex gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(page => {
+                      // Show first page, last page, current page, and pages around current
+                      if (page === 1 || page === totalPages) return true
+                      if (page >= currentPage - 1 && page <= currentPage + 1) return true
+                      return false
+                    })
+                    .map((page, index, array) => {
+                      // Add ellipsis
+                      const prevPage = array[index - 1]
+                      const showEllipsis = prevPage && page - prevPage > 1
+                      
+                      return (
+                        <div key={page} className="flex gap-1">
+                          {showEllipsis && (
+                            <span className="px-3 py-1.5 text-sm text-muted-foreground">...</span>
+                          )}
+                          <Button
+                            variant={currentPage === page ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => handlePageChange(page)}
+                            className="px-3 min-w-10"
+                          >
+                            {page}
+                          </Button>
+                        </div>
+                      )
+                    })}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="px-3"
+                >
+                  Next
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="px-3"
+                >
+                  Last
+                </Button>
+              </div>
+            </div>
+          </>
+          )}
         </div>
       </div>
+
+      {/* View Purchase Modal */}
+      {showViewModal && selectedPurchase && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card border border-border rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <h2 className="text-lg font-semibold text-foreground mb-4">Purchase Details</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">Purchase ID</label>
+                <p className="text-sm text-foreground font-medium">{selectedPurchase.purchaseId}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Date</label>
+                  <p className="text-sm text-foreground">{new Date(selectedPurchase.date).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Status</label>
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedPurchase.status)}`}
+                  >
+                    {selectedPurchase.status}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">Products</label>
+                <div className="border border-border rounded-md p-3 space-y-2 bg-muted/30">
+                  {selectedPurchase.items.map((item, index) => (
+                    <div key={index} className="flex justify-between items-start text-sm">
+                      <div>
+                        <p className="font-medium text-foreground">{item.productName}</p>
+                        <p className="text-xs text-muted-foreground">{item.productSku}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-foreground">Qty: {item.quantity} × ₹{item.unitPrice.toFixed(2)}</p>
+                        <p className="text-xs text-muted-foreground">₹{item.subtotal.toFixed(2)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">Supplier</label>
+                <p className="text-sm text-foreground">{selectedPurchase.supplier}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Total Items</label>
+                  <p className="text-sm text-foreground">{selectedPurchase.items.reduce((sum, item) => sum + item.quantity, 0)}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Total Amount</label>
+                  <p className="text-sm text-foreground font-medium">₹{selectedPurchase.totalAmount.toFixed(2)}</p>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">Payment Method</label>
+                <p className="text-sm text-foreground">{selectedPurchase.paymentMethod}</p>
+              </div>
+              {selectedPurchase.notes && (
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Notes</label>
+                  <p className="text-sm text-foreground">{selectedPurchase.notes}</p>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowViewModal(false)
+                  setSelectedPurchase(null)
+                }}
+                className="flex-1"
+              >
+                Close
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowViewModal(false)
+                  openEditModal(selectedPurchase)
+                }}
+                className="flex-1"
+              >
+                Edit Purchase
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Purchase Modal */}
+      {showEditModal && selectedPurchase && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card border border-border rounded-lg p-6 max-w-3xl w-full">
+            <h2 className="text-lg font-semibold text-foreground mb-6">Edit Purchase</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Purchase ID</label>
+                <Input value={selectedPurchase.purchaseId} disabled className="bg-muted" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Date</label>
+                <Input
+                  type="date"
+                  value={editFormData.date || ""}
+                  onChange={(e) => setEditFormData({ ...editFormData, date: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Supplier</label>
+                <Input
+                  value={editFormData.supplier || ""}
+                  onChange={(e) => setEditFormData({ ...editFormData, supplier: e.target.value })}
+                  placeholder="Enter supplier name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Payment Method</label>
+                <select
+                  value={editFormData.paymentMethod || "Cash"}
+                  onChange={(e) => setEditFormData({ ...editFormData, paymentMethod: e.target.value })}
+                  className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring text-sm"
+                >
+                  <option value="Cash">Cash</option>
+                  <option value="Credit Card">Credit Card</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="Cheque">Cheque</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Status</label>
+                <select
+                  value={editFormData.status || "Completed"}
+                  onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
+                  className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring text-sm"
+                >
+                  <option value="Pending">Pending</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-foreground mb-2">Notes</label>
+                <textarea
+                  value={editFormData.notes || ""}
+                  onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
+                  placeholder="Add notes..."
+                  className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  rows={3}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-foreground mb-2">Products (Read-only)</label>
+                <div className="border border-border rounded-md p-3 bg-muted/30 space-y-2">
+                  {selectedPurchase.items.map((item, index) => (
+                    <div key={index} className="text-sm text-muted-foreground">
+                      {item.productName} - Qty: {item.quantity} × ₹{item.unitPrice.toFixed(2)} = ₹{item.subtotal.toFixed(2)}
+                    </div>
+                  ))}
+                  <div className="pt-2 border-t border-border font-medium text-foreground">
+                    Total: ₹{selectedPurchase.totalAmount.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowEditModal(false)
+                  setSelectedPurchase(null)
+                }}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleUpdatePurchase}
+                className="flex-1"
+              >
+                Update Purchase
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-card border border-border rounded-lg p-6 max-w-sm mx-4">
+            <h2 className="text-lg font-semibold text-foreground mb-2">Delete Purchase</h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              Are you sure you want to delete this purchase record? This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowDeleteModal(false)
+                  setPurchaseToDelete(null)
+                }}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={confirmDelete} className="flex-1">
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </MainLayout>
   )
 }

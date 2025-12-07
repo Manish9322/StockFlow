@@ -2,13 +2,13 @@
 
 import type React from "react"
 
-import { useState, useMemo, useCallback } from "react"
+import { useState, useMemo, useCallback, useEffect } from "react"
 import MainLayout from "@/components/layout/main-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { sampleProducts } from "@/lib/sample-data"
 import { useRouter } from "next/navigation"
 import { ChevronDown } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 function debounce(func: (...args: any[]) => void, delay: number) {
   let timeoutId: ReturnType<typeof setTimeout>
@@ -31,21 +31,55 @@ function throttle(func: (...args: any[]) => void, delay: number) {
 
 export default function StockRefill() {
   const router = useRouter()
+  const { toast } = useToast()
+  const [products, setProducts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
   const [selectedProductId, setSelectedProductId] = useState("")
   const [quantityToAdd, setQuantityToAdd] = useState("")
   const [notes, setNotes] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
   const [showDropdown, setShowDropdown] = useState(false)
 
+  useEffect(() => {
+    fetchProducts()
+  }, [])
+
+  const fetchProducts = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch("/api/product")
+      const data = await response.json()
+      
+      if (data.success) {
+        setProducts(data.data)
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to fetch products",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch products",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const filteredProducts = useMemo(() => {
-    if (!searchQuery.trim()) return sampleProducts
-    return sampleProducts.filter(
-      (p) =>
+    if (!searchQuery.trim()) return products
+    return products.filter(
+      (p: any) =>
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.category.toLowerCase().includes(searchQuery.toLowerCase()),
+        p.category?.name?.toLowerCase().includes(searchQuery.toLowerCase()),
     )
-  }, [searchQuery])
+  }, [searchQuery, products])
 
   const handleSearchChange = useCallback(
     debounce((value: string) => {
@@ -61,20 +95,68 @@ export default function StockRefill() {
     [handleSearchChange],
   )
 
-  const selectedProduct = sampleProducts.find((p) => p.id === selectedProductId)
+  const selectedProduct = products.find((p: any) => p._id === selectedProductId)
   const updatedQuantity = selectedProduct ? selectedProduct.quantity + (Number.parseInt(quantityToAdd) || 0) : 0
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log({
-      productId: selectedProductId,
-      quantityAdded: quantityToAdd,
-      notes,
-    })
-    setSelectedProductId("")
-    setQuantityToAdd("")
-    setNotes("")
-    router.push("/")
+    
+    if (!selectedProductId || !quantityToAdd) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a product and enter quantity",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      setSubmitting(true)
+      const quantityInt = Number.parseInt(quantityToAdd)
+      
+      if (quantityInt <= 0) {
+        toast({
+          title: "Validation Error",
+          description: "Quantity must be greater than 0",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const response = await fetch(`/api/product/${selectedProductId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          quantity: updatedQuantity,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast({
+          title: "Success",
+          description: `Successfully added ${quantityInt} units to ${selectedProduct?.name}`,
+        })
+        router.push("/")
+      } else {
+        toast({
+          title: "Error",
+          description: data.error || "Failed to update stock",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update stock",
+        variant: "destructive",
+      })
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleCancel = () => {
@@ -91,7 +173,12 @@ export default function StockRefill() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="w-full">
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="w-full">
           <div className="bg-card border border-border rounded-lg p-4 md:p-8 space-y-4 md:space-y-6">
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">Select Product</label>
@@ -108,20 +195,22 @@ export default function StockRefill() {
                 </button>
 
                 {showDropdown && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-card border border-border rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
-                    <Input
-                      type="text"
-                      placeholder="Search products..."
-                      onChange={(e) => handleSearchThrottle(e.target.value)}
-                      className="m-2 border-border text-sm"
-                    />
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-card border border-border rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto overflow-x-hidden">
+                    <div className="p-2">
+                      <Input
+                        type="text"
+                        placeholder="Search products..."
+                        onChange={(e) => handleSearchThrottle(e.target.value)}
+                        className="border-border text-sm"
+                      />
+                    </div>
                     <div className="divide-y divide-border">
-                      {filteredProducts.map((p) => (
+                      {filteredProducts.map((p: any) => (
                         <button
-                          key={p.id}
+                          key={p._id}
                           type="button"
                           onClick={() => {
-                            setSelectedProductId(p.id)
+                            setSelectedProductId(p._id)
                             setShowDropdown(false)
                             setSearchQuery("")
                           }}
@@ -132,7 +221,7 @@ export default function StockRefill() {
                             <p className="text-xs text-muted-foreground">{p.sku}</p>
                           </div>
                           <div className="text-right ml-2">
-                            <p className="text-xs font-semibold text-foreground">{p.category}</p>
+                            <p className="text-xs font-semibold text-foreground">{p.category?.name || 'N/A'}</p>
                             <p className="text-xs text-muted-foreground">Stock: {p.quantity}</p>
                           </div>
                         </button>
@@ -153,7 +242,7 @@ export default function StockRefill() {
                   <div className="space-y-2">
                     <p className="font-semibold text-foreground text-sm md:text-base">{selectedProduct.name}</p>
                     <p className="text-xs md:text-sm text-muted-foreground">SKU: {selectedProduct.sku}</p>
-                    <p className="text-xs md:text-sm text-muted-foreground">Category: {selectedProduct.category}</p>
+                    <p className="text-xs md:text-sm text-muted-foreground">Category: {selectedProduct.category?.name || 'N/A'}</p>
                   </div>
                 </div>
                 <div>
@@ -194,20 +283,22 @@ export default function StockRefill() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-border">
-              <Button type="submit" className="flex-1 sm:flex-none">
-                Confirm Refill
+              <Button type="submit" className="flex-1 sm:flex-none" disabled={submitting}>
+                {submitting ? "Updating..." : "Confirm Refill"}
               </Button>
               <Button
                 variant="outline"
                 onClick={handleCancel}
                 type="button"
                 className="flex-1 sm:flex-none bg-transparent"
+                disabled={submitting}
               >
                 Cancel
               </Button>
             </div>
           </div>
         </form>
+        )}
       </div>
     </MainLayout>
   )

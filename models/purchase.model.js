@@ -1,0 +1,86 @@
+import mongoose from "mongoose";
+
+const purchaseSchema = new mongoose.Schema(
+  {
+    purchaseId: {
+      type: String,
+      unique: true,
+      trim: true,
+    },
+    date: {
+      type: Date,
+      required: [true, "Purchase date is required"],
+      default: Date.now,
+    },
+    items: [
+      {
+        product: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Product",
+          required: true,
+        },
+        productName: {
+          type: String,
+          required: true,
+        },
+        productSku: {
+          type: String,
+          required: true,
+        },
+        quantity: {
+          type: Number,
+          required: [true, "Quantity is required"],
+          min: [1, "Quantity must be at least 1"],
+        },
+        unitPrice: {
+          type: Number,
+          required: [true, "Unit price is required"],
+          min: [0, "Unit price must be positive"],
+        },
+        subtotal: {
+          type: Number,
+          required: true,
+        },
+      },
+    ],
+    totalAmount: {
+      type: Number,
+      required: [true, "Total amount is required"],
+      min: [0, "Total amount must be positive"],
+    },
+    status: {
+      type: String,
+      enum: ["Pending", "Completed", "Cancelled"],
+      default: "Completed",
+    },
+    supplier: {
+      type: String,
+      trim: true,
+      default: "N/A",
+    },
+    paymentMethod: {
+      type: String,
+      enum: ["Cash", "Credit Card", "Bank Transfer", "Cheque", "Other"],
+      default: "Cash",
+    },
+    notes: {
+      type: String,
+      trim: true,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+// Generate purchase ID before validation
+purchaseSchema.pre("validate", async function () {
+  if (!this.purchaseId) {
+    const count = await this.constructor.countDocuments();
+    this.purchaseId = `PUR-${String(count + 1).padStart(3, "0")}`;
+  }
+});
+
+const Purchase = mongoose.models.Purchase || mongoose.model("Purchase", purchaseSchema);
+
+export default Purchase;
