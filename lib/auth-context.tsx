@@ -24,14 +24,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Initialize from localStorage
+  // Initialize from localStorage after component mounts
   useEffect(() => {
-    const storedUser = localStorage.getItem("user")
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser))
-      } catch (error) {
-        console.error("Failed to parse stored user:", error)
+    if (typeof window !== "undefined") {
+      const storedUser = localStorage.getItem("user")
+      if (storedUser) {
+        try {
+          setUser(JSON.parse(storedUser))
+        } catch (error) {
+          console.error("Failed to parse stored user:", error)
+        }
       }
     }
     setLoading(false)
@@ -45,7 +47,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       name: email.split("@")[0],
     }
     setUser(userData)
-    localStorage.setItem("user", JSON.stringify(userData))
+    if (typeof window !== "undefined") {
+      localStorage.setItem("user", JSON.stringify(userData))
+    }
     console.log("[v0] User logged in:", userData)
   }
 
@@ -57,13 +61,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       name,
     }
     setUser(userData)
-    localStorage.setItem("user", JSON.stringify(userData))
+    if (typeof window !== "undefined") {
+      localStorage.setItem("user", JSON.stringify(userData))
+    }
     console.log("[v0] User signed up:", userData)
   }
 
   const logout = () => {
     setUser(null)
-    localStorage.removeItem("user")
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("user")
+    }
     console.log("[v0] User logged out")
   }
 
@@ -73,6 +81,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext)
   if (!context) {
+    // Provide a fallback during SSR or when context is not available
+    if (typeof window === "undefined") {
+      return {
+        user: null,
+        loading: true,
+        login: async () => {},
+        signup: async () => {},
+        logout: () => {},
+      }
+    }
     throw new Error("useAuth must be used within AuthProvider")
   }
   return context

@@ -1,13 +1,13 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Geist, Geist_Mono, Open_Sans } from "next/font/google"
+import { Open_Sans } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 import { AuthProvider } from "@/lib/auth-context"
 import { LanguageProvider } from "@/lib/language-context"
+import { ReduxProvider } from "@/lib/redux-provider"
+import { Toaster } from "@/components/ui/sonner"
 
-const _geist = Geist({ subsets: ["latin"] })
-const _geistMono = Geist_Mono({ subsets: ["latin"] })
 const openSans = Open_Sans({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
@@ -41,9 +41,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${openSans.className} font-sans antialiased`}>
-        <LanguageProvider>
-          <AuthProvider>{children}</AuthProvider>
-        </LanguageProvider>
+        <ReduxProvider>
+          <LanguageProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </LanguageProvider>
+        </ReduxProvider>
+        <Toaster />
         <Analytics />
       </body>
     </html>

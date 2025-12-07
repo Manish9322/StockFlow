@@ -261,31 +261,40 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    // Load saved language preference
+    setMounted(true)
+    // Load saved language preference after mounting
     const savedLanguage = localStorage.getItem("language") as Language | null
     if (savedLanguage && (savedLanguage === "en" || savedLanguage === "hi")) {
       setLanguageState(savedLanguage)
     }
-    setMounted(true)
   }, [])
 
   const setLanguage = (lang: Language) => {
     setLanguageState(lang)
-    localStorage.setItem("language", lang)
+    if (typeof window !== "undefined") {
+      localStorage.setItem("language", lang)
+    }
   }
 
   const t = (key: string): string => {
     return translations[language][key] || translations["en"][key] || key
   }
 
-  if (!mounted) return <>{children}</>
-
+  // Always provide context, even during SSR
   return <LanguageContext.Provider value={{ language, setLanguage, t }}>{children}</LanguageContext.Provider>
 }
 
 export function useLanguage() {
   const context = useContext(LanguageContext)
   if (!context) {
+    // Provide a fallback during SSR or when context is not available
+    if (typeof window === "undefined") {
+      return {
+        language: "en" as Language,
+        setLanguage: () => {},
+        t: (key: string) => translations["en"][key] || key,
+      }
+    }
     throw new Error("useLanguage must be used within LanguageProvider")
   }
   return context

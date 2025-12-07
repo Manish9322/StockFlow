@@ -2,58 +2,158 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { use, useState, useEffect } from "react"
 import MainLayout from "@/components/layout/main-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { sampleProducts } from "@/lib/sample-data"
+import { useGetProductByIdQuery, useGetCategoriesQuery, useGetUnitTypesQuery, useUpdateProductMutation } from "@/lib/utils/services/api"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ChevronLeft } from "lucide-react"
+import { ChevronLeft, Upload, X } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
-export default function EditProduct({ params }: { params: { id: string } }) {
+export default function EditProduct({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
   const router = useRouter()
-  const product = sampleProducts.find((p) => p.id === params.id)
+  const { toast } = useToast()
+  
+  const { data: productData, isLoading: productLoading, error: productError } = useGetProductByIdQuery(id)
+  const { data: categoriesData, isLoading: categoriesLoading } = useGetCategoriesQuery({})
+  const { data: unitTypesData, isLoading: unitTypesLoading } = useGetUnitTypesQuery({})
+  const [updateProduct, { isLoading: isUpdating }] = useUpdateProductMutation()
+  
+  const product = productData?.data
+  const categories = categoriesData?.data || []
+  const unitTypes = unitTypesData?.data || []
 
-  const [formData, setFormData] = useState(
-    product || {
-      name: "",
-      sku: "",
-      category: "",
-      quantity: "",
-      costPrice: "",
-      sellingPrice: "",
-      supplier: "",
-    },
-  )
+  const [formData, setFormData] = useState({
+    name: "",
+    sku: "",
+    description: "",
+    category: "",
+    unitType: "",
+    unitSize: "",
+    quantity: "",
+    costPrice: "",
+    sellingPrice: "",
+    supplier: "",
+    supplierContact: "",
+    supplierRegistrationNumber: "",
+    minStockAlert: "",
+    status: "active",
+  })
 
-  const categories = ["Electronics", "Accessories", "Cables", "Storage", "Displays"]
+  const [images, setImages] = useState<File[]>([])
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setImages((prev) => [...prev, ...Array.from(e.target.files)])
+    }
+  }
+
+  const removeImage = (index: number) => {
+    setImages((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  useEffect(() => {
+    if (product) {
+      setFormData({
+        name: product.name || "",
+        sku: product.sku || "",
+        description: product.description || "",
+        category: product.category?._id || "",
+        unitType: product.unitType?._id || "",
+        unitSize: product.unitSize?.toString() || "",
+        quantity: product.quantity?.toString() || "0",
+        costPrice: product.costPrice?.toString() || "",
+        sellingPrice: product.sellingPrice?.toString() || "",
+        supplier: product.supplier || "",
+        supplierContact: product.supplierContact || "",
+        supplierRegistrationNumber: product.supplierRegistrationNumber || "",
+        minStockAlert: product.minStockAlert?.toString() || "10",
+        status: product.status || "active",
+      })
+    }
+  }, [product])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleCategoryChange = (value: string) => {
-    setFormData((prev) => ({ ...prev, category: value }))
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("Form submitted:", formData)
-    router.push(`/product/${product?.id}`)
+    
+    try {
+      await updateProduct({
+        id,
+        name: formData.name,
+        sku: formData.sku,
+        description: formData.description,
+        category: formData.category,
+        unitType: formData.unitType,
+        unitSize: parseFloat(formData.unitSize),
+        quantity: parseInt(formData.quantity),
+        costPrice: parseFloat(formData.costPrice),
+        sellingPrice: parseFloat(formData.sellingPrice),
+        supplier: formData.supplier,
+        supplierContact: formData.supplierContact,
+        supplierRegistrationNumber: formData.supplierRegistrationNumber,
+        minStockAlert: parseInt(formData.minStockAlert),
+        status: formData.status,
+      }).unwrap()
+      
+      toast({
+        title: "Success",
+        description: "Product updated successfully",
+      })
+      
+      router.push(`/product/${id}`)
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.data?.error || "Failed to update product",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleCancel = () => {
-    router.push(`/product/${product?.id}`)
+    router.push(`/product/${id}`)
   }
 
-  if (!product) {
+  if (productLoading || categoriesLoading || unitTypesLoading) {
     return (
       <MainLayout>
-        <div className="p-8">
-          <p className="text-muted-foreground">Product not found</p>
+        <div className="p-4 md:p-8 space-y-6">
+          <div className="h-8 bg-muted rounded w-48 animate-pulse"></div>
+          <div className="h-10 bg-muted rounded w-64 animate-pulse"></div>
+          <div className="space-y-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-20 bg-muted rounded animate-pulse"></div>
+            ))}
+          </div>
+        </div>
+      </MainLayout>
+    )
+  }
+
+  if (productError || !product) {
+    return (
+      <MainLayout>
+        <div className="p-4 md:p-8">
+          <Link href="/" className="flex items-center gap-2 text-primary hover:underline mb-6">
+            <ChevronLeft size={18} />
+            Back to Dashboard
+          </Link>
+          <p className="text-sm md:text-base text-destructive">
+            {productError ? "Failed to load product" : "Product not found"}
+          </p>
         </div>
       </MainLayout>
     )
@@ -61,55 +161,89 @@ export default function EditProduct({ params }: { params: { id: string } }) {
 
   return (
     <MainLayout>
-      <div className="p-8">
-        <Link href={`/product/${product.id}`} className="flex items-center gap-2 text-primary hover:underline mb-6">
+      <div className="p-4 md:p-8">
+        <Link href={`/product/${id}`} className="flex items-center gap-2 text-primary hover:underline mb-6">
           <ChevronLeft size={18} />
           Back to Product
         </Link>
 
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Edit Product</h1>
-          <p className="text-muted-foreground">Update product information</p>
+        <div className="mb-6 md:mb-8">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Edit Product</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Update product information</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="max-w-2xl">
-          <div className="bg-card border border-border rounded-lg p-8 space-y-6">
-            <div className="grid grid-cols-2 gap-6">
+        <form onSubmit={handleSubmit} className="w-full pb-8">
+          <div className="bg-card border border-border rounded-lg p-4 md:p-8 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Product Name</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Product Name *</label>
                 <Input name="name" value={formData.name} onChange={handleChange} required />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">SKU</label>
+                <label className="block text-sm font-medium text-foreground mb-2">SKU *</label>
                 <Input name="sku" value={formData.sku} onChange={handleChange} required />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">Description</label>
+              <Input name="description" value={formData.description} onChange={handleChange} />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Category</label>
-                <Select value={formData.category} onValueChange={handleCategoryChange}>
+                <label className="block text-sm font-medium text-foreground mb-2">Category *</label>
+                <Select value={formData.category} onValueChange={(value) => handleSelectChange("category", value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
+                    {categories.map((cat: any) => (
+                      <SelectItem key={cat._id} value={cat._id}>
+                        {cat.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Quantity</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Unit Type *</label>
+                <Select value={formData.unitType} onValueChange={(value) => handleSelectChange("unitType", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select unit type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {unitTypes.map((unit: any) => (
+                      <SelectItem key={unit._id} value={unit._id}>
+                        {unit.name} ({unit.abbreviation})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Unit Size *</label>
+                <Input 
+                  name="unitSize" 
+                  type="number" 
+                  step="0.01"
+                  value={formData.unitSize} 
+                  onChange={handleChange} 
+                  required 
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Quantity *</label>
                 <Input name="quantity" type="number" value={formData.quantity} onChange={handleChange} required />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Cost Price ($)</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Cost Price (₹) *</label>
                 <Input
                   name="costPrice"
                   type="number"
@@ -120,7 +254,7 @@ export default function EditProduct({ params }: { params: { id: string } }) {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Selling Price ($)</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Selling Price (₹) *</label>
                 <Input
                   name="sellingPrice"
                   type="number"
@@ -132,14 +266,88 @@ export default function EditProduct({ params }: { params: { id: string } }) {
               </div>
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Supplier Name *</label>
+                <Input name="supplier" value={formData.supplier} onChange={handleChange} required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Supplier Contact</label>
+                <Input name="supplierContact" value={formData.supplierContact} onChange={handleChange} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Supplier Registration No.</label>
+                <Input name="supplierRegistrationNumber" value={formData.supplierRegistrationNumber} onChange={handleChange} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Min Stock Alert *</label>
+                <Input
+                  name="minStockAlert"
+                  type="number"
+                  value={formData.minStockAlert}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+            </div>
+
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Supplier Name</label>
-              <Input name="supplier" value={formData.supplier} onChange={handleChange} required />
+              <label className="block text-sm font-medium text-foreground mb-2">Status *</label>
+              <Select value={formData.status} onValueChange={(value) => handleSelectChange("status", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="discontinued">Discontinued</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="border-t border-border pt-6">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Product Images</h2>
+              
+              {images.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  {images.map((image, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={URL.createObjectURL(image)}
+                        alt={`Preview ${index + 1}`}
+                        className="w-full h-32 object-cover rounded-lg border border-border"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(index)}
+                        className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
+                <Upload size={24} className="mx-auto mb-2 text-muted-foreground" />
+                <label className="cursor-pointer">
+                  <span className="text-sm text-primary hover:underline">Click to upload</span>
+                  <input type="file" multiple accept="image/*" onChange={handleImageChange} className="hidden" />
+                </label>
+                <p className="text-xs text-muted-foreground mt-2">PNG, JPG, GIF up to 5MB</p>
+                {images.length > 0 && <p className="text-xs text-foreground mt-2">{images.length} image(s) selected</p>}
+              </div>
             </div>
 
             <div className="flex gap-4 pt-4 border-t border-border">
-              <Button type="submit">Save Changes</Button>
-              <Button variant="outline" onClick={handleCancel} type="button">
+              <Button type="submit" disabled={isUpdating}>
+                {isUpdating ? "Saving..." : "Save Changes"}
+              </Button>
+              <Button variant="outline" onClick={handleCancel} type="button" disabled={isUpdating}>
                 Cancel
               </Button>
             </div>
