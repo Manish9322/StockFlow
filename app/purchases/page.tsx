@@ -6,7 +6,7 @@ import { ProtectedRoute } from "@/components/protected-route"
 import { useLanguage } from "@/lib/language-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Download, Eye, Pencil, Trash2 } from "lucide-react"
+import { Download, Eye, Pencil, Trash2, ShoppingCart, DollarSign, Package, TrendingUp } from "lucide-react"
 import { toast } from "sonner"
 
 interface PurchaseItem {
@@ -261,6 +261,67 @@ function PurchasesContent() {
           <p className="text-sm md:text-base text-muted-foreground">
             View all purchase orders with detailed history, filtering options, and export capabilities
           </p>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
+          <div className="bg-card border border-border rounded-lg px-5 py-3">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Purchases</p>
+                <p className="text-3xl font-bold text-foreground">{purchases.length}</p>
+                <p className="text-xs text-muted-foreground">All time</p>
+              </div>
+              <div className="h-11 w-11 rounded-md from-primary/20 to-primary/5 flex items-center justify-center ring-1 ring-primary/10">
+                <ShoppingCart className="h-5 w-5 text-primary" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-card border border-border rounded-lg px-5 py-3">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Spent</p>
+                <p className="text-3xl font-bold text-foreground">
+                  ₹{purchases.reduce((sum, p) => sum + p.totalAmount, 0).toFixed(2)}
+                </p>
+                <p className="text-xs text-muted-foreground">Revenue</p>
+              </div>
+              <div className="h-11 w-11 rounded-md from-primary/20 to-primary/5 flex items-center justify-center ring-1 ring-primary/10">
+                <DollarSign className="h-5 w-5 text-primary" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-card border border-border rounded-lg px-5 py-3">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Items</p>
+                <p className="text-3xl font-bold text-foreground">
+                  {purchases.reduce((sum, p) => sum + p.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0)}
+                </p>
+                <p className="text-xs text-muted-foreground">Purchased</p>
+              </div>
+              <div className="h-11 w-11 rounded-md from-primary/20 to-primary/5 flex items-center justify-center ring-1 ring-primary/10">
+                <Package className="h-5 w-5 text-primary" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-card border border-border rounded-lg px-5 py-3">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Completed</p>
+                <p className="text-3xl font-bold text-foreground">
+                  {purchases.filter(p => p.status.toLowerCase() === "completed").length}
+                </p>
+                <p className="text-xs text-muted-foreground">Orders</p>
+              </div>
+              <div className="h-11 w-11 rounded-md from-primary/20 to-primary/5 flex items-center justify-center ring-1 ring-primary/10">
+                <TrendingUp className="h-5 w-5 text-primary" />
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="bg-card border border-border rounded-lg p-6 space-y-6">
