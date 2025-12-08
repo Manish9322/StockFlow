@@ -5,88 +5,127 @@ import MainLayout from "@/components/layout/main-layout"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useLanguage } from "@/lib/language-context"
 import { useAuth } from "@/lib/auth-context"
-import { getEventLogs, initializeSampleEvents, type EventType } from "@/lib/event-logger"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Download, Eye, Activity, Users, FileText, TrendingUp, Trash2 } from "lucide-react"
+import { Download, Eye, Activity, Users, FileText, TrendingUp, Trash2, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
+
+export type EventType =
+  | "product.created"
+  | "product.updated"
+  | "product.deleted"
+  | "stock.changed"
+  | "stock.refill"
+  | "category.created"
+  | "category.updated"
+  | "category.deleted"
+  | "purchase.created"
+  | "purchase.updated"
+  | "purchase.deleted"
+  | "settings.changed"
+  | "auth.login"
+  | "auth.logout"
+
+interface Movement {
+  _id: string
+  eventType: EventType
+  eventTitle: string
+  description: string
+  userId: string
+  userName: string
+  userEmail?: string
+  relatedProduct?: any
+  relatedPurchase?: any
+  relatedCategory?: any
+  metadata?: Record<string, any>
+  changes?: {
+    before?: any
+    after?: any
+  }
+  createdAt: string
+  updatedAt: string
+}
 
 function MovementHistoryContent() {
   const { t } = useLanguage()
   const { user } = useAuth()
-  const [events, setEvents] = useState<any[]>([])
+  const [movements, setMovements] = useState<Movement[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [eventTypeFilter, setEventTypeFilter] = useState<EventType | "all">("all")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
-  const [selectedEvent, setSelectedEvent] = useState<any | null>(null)
+  const [selectedMovement, setSelectedMovement] = useState<Movement | null>(null)
   const [showViewModal, setShowViewModal] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [eventToDelete, setEventToDelete] = useState<string | null>(null)
+  const [movementToDelete, setMovementToDelete] = useState<string | null>(null)
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(5)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
 
   useEffect(() => {
-    fetchEvents()
+    fetchMovements()
   }, [])
 
-  const fetchEvents = async () => {
+  const fetchMovements = async () => {
     try {
       setLoading(true)
-      // Initialize with sample events on first load
-      initializeSampleEvents()
-      const allEvents = getEventLogs()
-      setEvents(allEvents)
+      const response = await fetch("/api/movement")
+      const data = await response.json()
+      
+      if (data.success) {
+        setMovements(data.data)
+      } else {
+        toast.error("Failed to fetch movements")
+      }
     } catch (error) {
-      console.error("Error fetching events:", error)
-      toast.error("Failed to fetch events")
+      console.error("Error fetching movements:", error)
+      toast.error("Failed to fetch movements")
     } finally {
       setLoading(false)
     }
   }
 
   // Filter events based on search query and advanced filters
-  const filteredEvents = useMemo(() => {
-    let filtered = events
+  const filteredMovements = useMemo(() => {
+    let filtered = movements
 
     // Search filter
     if (searchQuery.trim()) {
       filtered = filtered.filter(
-        (e) =>
-          e.eventTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          e.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          e.userName.toLowerCase().includes(searchQuery.toLowerCase()),
+        (m) =>
+          m.eventTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          m.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          m.userName.toLowerCase().includes(searchQuery.toLowerCase()),
       )
     }
 
     // Event type filter
     if (eventTypeFilter !== "all") {
-      filtered = filtered.filter((e) => e.eventType === eventTypeFilter)
+      filtered = filtered.filter((m) => m.eventType === eventTypeFilter)
     }
 
     // Date range filter
     if (dateFrom) {
-      filtered = filtered.filter((e) => new Date(e.timestamp) >= new Date(dateFrom))
+      filtered = filtered.filter((m) => new Date(m.createdAt) >= new Date(dateFrom))
     }
 
     if (dateTo) {
-      filtered = filtered.filter((e) => new Date(e.timestamp) <= new Date(dateTo + "T23:59:59"))
+      filtered = filtered.filter((m) => new Date(m.createdAt) <= new Date(dateTo + "T23:59:59"))
     }
 
     return filtered
-  }, [events, searchQuery, eventTypeFilter, dateFrom, dateTo])
+  }, [movements, searchQuery, eventTypeFilter, dateFrom, dateTo])
 
   // Pagination calculations
-  const totalPages = Math.ceil(filteredEvents.length / itemsPerPage)
+  const totalPages = Math.ceil(filteredMovements.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
-  const paginatedEvents = filteredEvents.slice(startIndex, endIndex)
+  const paginatedMovements = filteredMovements.slice(startIndex, endIndex)
 
   // Reset to page 1 when filters change
   useMemo(() => {
@@ -106,33 +145,31 @@ function MovementHistoryContent() {
     { value: "all", label: "All Events" },
     { value: "product.created", label: "Product Created" },
     { value: "product.updated", label: "Product Updated" },
+    { value: "product.deleted", label: "Product Deleted" },
     { value: "stock.changed", label: "Stock Changed" },
+    { value: "stock.refill", label: "Stock Refill" },
+    { value: "category.created", label: "Category Created" },
+    { value: "category.updated", label: "Category Updated" },
+    { value: "category.deleted", label: "Category Deleted" },
     { value: "purchase.created", label: "Purchase Created" },
+    { value: "purchase.updated", label: "Purchase Updated" },
+    { value: "purchase.deleted", label: "Purchase Deleted" },
     { value: "settings.changed", label: "Settings Changed" },
     { value: "auth.login", label: "Login" },
     { value: "auth.logout", label: "Logout" },
   ]
 
   const getEventColor = (eventType: EventType) => {
-    const colors: Record<string, string> = {
-      "product.created": "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-      "product.updated": "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400",
-      "product.deleted": "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-      "stock.changed": "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-      "purchase.created": "bg-primary/10 text-primary",
-      "settings.changed": "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-      "auth.login": "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
-      "auth.logout": "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
-    }
-    return colors[eventType] || "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+    // Uniform gray badge for all event types
+    return "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-200"
   }
 
   const handleExportCSV = (format: "csv" | "excel" | "pdf") => {
     if (format === "csv") {
       const csv = [
         ["Timestamp", "User", "Event", "Description"].join(","),
-        ...filteredEvents.map((e) =>
-          [new Date(e.timestamp).toLocaleString(), e.userName, e.eventTitle, `"${e.description}"`].join(","),
+        ...filteredMovements.map((m) =>
+          [new Date(m.createdAt).toLocaleString(), m.userName, m.eventTitle, `"${m.description}"`].join(","),
         ),
       ].join("\n")
 
@@ -149,27 +186,42 @@ function MovementHistoryContent() {
     }
   }
 
-  const openViewModal = (event: any) => {
-    setSelectedEvent(event)
+  const openViewModal = (movement: Movement) => {
+    setSelectedMovement(movement)
     setShowViewModal(true)
   }
 
-  const handleDeleteEvent = (id: string) => {
-    setEventToDelete(id)
+  const handleDeleteMovement = (id: string) => {
+    setMovementToDelete(id)
     setShowDeleteModal(true)
   }
 
-  const confirmDelete = () => {
-    if (eventToDelete) {
-      setEvents(events.filter(e => e.id !== eventToDelete))
-      toast.success("Event deleted successfully")
-      setShowDeleteModal(false)
-      setEventToDelete(null)
+  const confirmDelete = async () => {
+    if (movementToDelete) {
+      try {
+        const response = await fetch(`/api/movement/${movementToDelete}`, {
+          method: "DELETE",
+        })
+        const data = await response.json()
+        
+        if (data.success) {
+          setMovements(movements.filter(m => m._id !== movementToDelete))
+          toast.success("Movement deleted successfully")
+        } else {
+          toast.error("Failed to delete movement")
+        }
+      } catch (error) {
+        console.error("Error deleting movement:", error)
+        toast.error("Failed to delete movement")
+      } finally {
+        setShowDeleteModal(false)
+        setMovementToDelete(null)
+      }
     }
   }
 
   // Get unique users
-  const uniqueUsers = Array.from(new Set(events.map(e => e.userName))).length
+  const uniqueUsers = Array.from(new Set(movements.map(m => m.userName))).length
 
   return (
     <MainLayout>
@@ -187,7 +239,7 @@ function MovementHistoryContent() {
             <div className="flex items-start justify-between">
               <div className="space-y-1">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Events</p>
-                <p className="text-3xl font-bold text-foreground">{events.length}</p>
+                <p className="text-3xl font-bold text-foreground">{movements.length}</p>
                 <p className="text-xs text-muted-foreground">All time</p>
               </div>
               <div className="h-11 w-11 rounded-md from-primary/20 to-primary/5 flex items-center justify-center ring-1 ring-primary/10">
@@ -214,7 +266,7 @@ function MovementHistoryContent() {
               <div className="space-y-1">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Product Events</p>
                 <p className="text-3xl font-bold text-foreground">
-                  {events.filter(e => e.eventType.startsWith("product.")).length}
+                  {movements.filter(m => m.eventType.startsWith("product.")).length}
                 </p>
                 <p className="text-xs text-muted-foreground">Activities</p>
               </div>
@@ -229,7 +281,7 @@ function MovementHistoryContent() {
               <div className="space-y-1">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Stock Changes</p>
                 <p className="text-3xl font-bold text-foreground">
-                  {events.filter(e => e.eventType === "stock.changed").length}
+                  {movements.filter(m => m.eventType === "stock.changed" || m.eventType === "stock.refill").length}
                 </p>
                 <p className="text-xs text-muted-foreground">Adjustments</p>
               </div>
@@ -261,6 +313,15 @@ function MovementHistoryContent() {
               </Button>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={fetchMovements}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 bg-transparent"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Refresh
+              </Button>
               <Button
                 onClick={() => handleExportCSV("csv")}
                 variant="outline"
@@ -346,12 +407,12 @@ function MovementHistoryContent() {
           {/* Events Table */}
           {loading ? (
             <div className="text-center py-12">
-              <p className="text-sm text-muted-foreground">Loading events...</p>
+              <p className="text-sm text-muted-foreground">Loading movements...</p>
             </div>
-          ) : filteredEvents.length === 0 ? (
+          ) : filteredMovements.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-sm text-muted-foreground">
-                {searchQuery ? "No events found matching your search." : "No events yet."}
+                {searchQuery ? "No movements found matching your search." : "No movements yet. Start by creating products or making purchases."}
               </p>
             </div>
           ) : (
@@ -369,26 +430,26 @@ function MovementHistoryContent() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {paginatedEvents.map((event) => (
-                        <TableRow key={event.id}>
+                      {paginatedMovements.map((movement) => (
+                        <TableRow key={movement._id}>
                           <TableCell className="text-sm">
-                            {new Date(event.timestamp).toLocaleString()}
+                            {new Date(movement.createdAt).toLocaleString()}
                           </TableCell>
-                          <TableCell className="text-sm">{event.userName}</TableCell>
+                          <TableCell className="text-sm">{movement.userName}</TableCell>
                           <TableCell className="text-sm">
                             <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getEventColor(event.eventType)}`}
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getEventColor(movement.eventType)}`}
                             >
-                              {event.eventTitle}
+                              {movement.eventTitle}
                             </span>
                           </TableCell>
                           <TableCell className="text-sm max-w-md">
-                            <div className="truncate">{event.description}</div>
+                            <div className="truncate">{movement.description}</div>
                           </TableCell>
                           <TableCell className="text-center">
                             <div className="flex items-center justify-center gap-1">
                               <Button
-                                onClick={() => openViewModal(event)}
+                                onClick={() => openViewModal(movement)}
                                 variant="ghost"
                                 size="sm"
                                 className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
@@ -397,7 +458,7 @@ function MovementHistoryContent() {
                                 <Eye className="h-4 w-4" />
                               </Button>
                               <Button
-                                onClick={() => handleDeleteEvent(event.id)}
+                                onClick={() => handleDeleteMovement(movement._id)}
                                 variant="ghost"
                                 size="sm"
                                 className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30"
@@ -431,10 +492,11 @@ function MovementHistoryContent() {
                       <SelectItem value="10">10</SelectItem>
                       <SelectItem value="25">25</SelectItem>
                       <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
                     </SelectContent>
                   </Select>
                   <span className="text-sm text-muted-foreground">
-                    of {filteredEvents.length} events
+                    of {filteredMovements.length} events
                   </span>
                 </div>
 
@@ -509,41 +571,101 @@ function MovementHistoryContent() {
       </div>
 
       {/* View Event Modal */}
-      {showViewModal && selectedEvent && (
+      {showViewModal && selectedMovement && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-card border border-border rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <h2 className="text-lg font-semibold text-foreground mb-4">Event Details</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-4">Movement Details</h2>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground mb-1">Timestamp</label>
                   <p className="text-sm text-foreground">
-                    {new Date(selectedEvent.timestamp).toLocaleString()}
+                    {new Date(selectedMovement.createdAt).toLocaleString()}
                   </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground mb-1">User</label>
-                  <p className="text-sm text-foreground">{selectedEvent.userName}</p>
+                  <p className="text-sm text-foreground">{selectedMovement.userName}</p>
+                  {selectedMovement.userEmail && (
+                    <p className="text-xs text-muted-foreground">{selectedMovement.userEmail}</p>
+                  )}
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-muted-foreground mb-1">Event Type</label>
                 <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getEventColor(selectedEvent.eventType)}`}
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getEventColor(selectedMovement.eventType)}`}
                 >
-                  {selectedEvent.eventTitle}
+                  {selectedMovement.eventTitle}
                 </span>
               </div>
               <div>
                 <label className="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-                <p className="text-sm text-foreground">{selectedEvent.description}</p>
+                <p className="text-sm text-foreground">{selectedMovement.description}</p>
               </div>
-              {selectedEvent.metadata && Object.keys(selectedEvent.metadata).length > 0 && (
+              
+              {/* Related entities */}
+              {selectedMovement.relatedProduct && (
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Related Product</label>
+                  <div className="border border-border rounded-md p-3 bg-muted/30">
+                    <p className="text-sm text-foreground font-medium">{selectedMovement.relatedProduct.name}</p>
+                    <p className="text-xs text-muted-foreground">SKU: {selectedMovement.relatedProduct.sku}</p>
+                  </div>
+                </div>
+              )}
+              
+              {selectedMovement.relatedPurchase && (
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Related Purchase</label>
+                  <div className="border border-border rounded-md p-3 bg-muted/30">
+                    <p className="text-sm text-foreground font-medium">
+                      Purchase ID: {selectedMovement.relatedPurchase.purchaseId}
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {selectedMovement.relatedCategory && (
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Related Category</label>
+                  <div className="border border-border rounded-md p-3 bg-muted/30">
+                    <p className="text-sm text-foreground font-medium">{selectedMovement.relatedCategory.name}</p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Changes */}
+              {selectedMovement.changes && (selectedMovement.changes.before || selectedMovement.changes.after) && (
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">Changes</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {selectedMovement.changes.before && (
+                      <div className="border border-border rounded-md p-3 bg-red-50 dark:bg-red-900/10">
+                        <p className="text-xs font-medium text-muted-foreground mb-2">Before</p>
+                        <pre className="text-xs text-foreground overflow-x-auto">
+                          {JSON.stringify(selectedMovement.changes.before, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                    {selectedMovement.changes.after && (
+                      <div className="border border-border rounded-md p-3 bg-green-50 dark:bg-green-900/10">
+                        <p className="text-xs font-medium text-muted-foreground mb-2">After</p>
+                        <pre className="text-xs text-foreground overflow-x-auto">
+                          {JSON.stringify(selectedMovement.changes.after, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {selectedMovement.metadata && Object.keys(selectedMovement.metadata).length > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground mb-1">Additional Details</label>
                   <div className="border border-border rounded-md p-3 bg-muted/30">
                     <pre className="text-xs text-foreground overflow-x-auto">
-                      {JSON.stringify(selectedEvent.metadata, null, 2)}
+                      {JSON.stringify(selectedMovement.metadata, null, 2)}
                     </pre>
                   </div>
                 </div>
@@ -554,7 +676,7 @@ function MovementHistoryContent() {
                 variant="outline"
                 onClick={() => {
                   setShowViewModal(false)
-                  setSelectedEvent(null)
+                  setSelectedMovement(null)
                 }}
                 className="flex-1"
               >
@@ -569,16 +691,16 @@ function MovementHistoryContent() {
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-card border border-border rounded-lg p-6 max-w-sm w-full">
-            <h2 className="text-lg font-semibold text-foreground mb-2">Delete Event</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-2">Delete Movement</h2>
             <p className="text-sm text-muted-foreground mb-6">
-              Are you sure you want to delete this event from the history? This action cannot be undone.
+              Are you sure you want to delete this movement from the history? This action cannot be undone.
             </p>
             <div className="flex gap-3">
               <Button
                 variant="outline"
                 onClick={() => {
                   setShowDeleteModal(false)
-                  setEventToDelete(null)
+                  setMovementToDelete(null)
                 }}
                 className="flex-1"
               >

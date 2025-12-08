@@ -207,7 +207,7 @@ function AddProductContent() {
                   <Input
                     name="sku"
                     value={formData.sku}
-                    placeholder="e.g., LAP-001"
+                    placeholder="e.g., ELECUM8G1UXS"
                     required
                     readOnly
                     className="bg-muted cursor-not-allowed"

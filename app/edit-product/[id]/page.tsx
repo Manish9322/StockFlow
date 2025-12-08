@@ -12,11 +12,14 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ChevronLeft, Upload, X } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { logMovement } from "@/lib/movement-logger"
+import { useAuth } from "@/lib/auth-context"
 
 export default function EditProduct({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
   const { toast } = useToast()
+  const { user } = useAuth()
   
   const { data: productData, isLoading: productLoading, error: productError } = useGetProductByIdQuery(id)
   const { data: categoriesData, isLoading: categoriesLoading } = useGetCategoriesQuery({})
@@ -48,7 +51,7 @@ export default function EditProduct({ params }: { params: Promise<{ id: string }
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setImages((prev) => [...prev, ...Array.from(e.target.files)])
+      setImages((prev) => [...prev, ...Array.from(e.target.files!)])
     }
   }
 
@@ -90,7 +93,19 @@ export default function EditProduct({ params }: { params: Promise<{ id: string }
     e.preventDefault()
     
     try {
-      await updateProduct({
+      // Store original values for change tracking
+      const originalData = {
+        name: product.name,
+        sku: product.sku,
+        quantity: product.quantity,
+        costPrice: product.costPrice,
+        sellingPrice: product.sellingPrice,
+        supplier: product.supplier,
+        minStockAlert: product.minStockAlert,
+        status: product.status,
+      }
+      
+      const updatedData = await updateProduct({
         id,
         name: formData.name,
         sku: formData.sku,
@@ -107,6 +122,68 @@ export default function EditProduct({ params }: { params: Promise<{ id: string }
         minStockAlert: parseInt(formData.minStockAlert),
         status: formData.status,
       }).unwrap()
+      
+      // Log movement for product update
+      const changedFields = []
+      if (originalData.name !== formData.name) changedFields.push('name')
+      if (originalData.sku !== formData.sku) changedFields.push('SKU')
+      if (originalData.quantity !== parseInt(formData.quantity)) changedFields.push('quantity')
+      if (originalData.costPrice !== parseFloat(formData.costPrice)) changedFields.push('cost price')
+      if (originalData.sellingPrice !== parseFloat(formData.sellingPrice)) changedFields.push('selling price')
+      if (originalData.supplier !== formData.supplier) changedFields.push('supplier')
+      if (originalData.minStockAlert !== parseInt(formData.minStockAlert)) changedFields.push('min stock alert')
+      if (originalData.status !== formData.status) changedFields.push('status')
+      
+      if (changedFields.length > 0) {
+        await logMovement({
+          eventType: "product.updated",
+          eventTitle: "Product Updated",
+          description: `Updated product "${formData.name}" (${changedFields.join(', ')})`,
+          userId: user?.id || "system",
+          userName: user?.name || "System",
+          userEmail: user?.email,
+          relatedProduct: id,
+          metadata: {
+            productName: formData.name,
+            sku: formData.sku,
+            changedFields,
+          },
+          changes: {
+            before: originalData,
+            after: {
+              name: formData.name,
+              sku: formData.sku,
+              quantity: parseInt(formData.quantity),
+              costPrice: parseFloat(formData.costPrice),
+              sellingPrice: parseFloat(formData.sellingPrice),
+              supplier: formData.supplier,
+              minStockAlert: parseInt(formData.minStockAlert),
+              status: formData.status,
+            },
+          },
+        })
+        
+        // If quantity changed, log stock change separately
+        if (originalData.quantity !== parseInt(formData.quantity)) {
+          const quantityDiff = parseInt(formData.quantity) - originalData.quantity
+          await logMovement({
+            eventType: "stock.changed",
+            eventTitle: "Stock Changed",
+            description: `Stock ${quantityDiff > 0 ? 'increased' : 'decreased'} for "${formData.name}": ${quantityDiff > 0 ? '+' : ''}${quantityDiff} units (${originalData.quantity} → ${formData.quantity})`,
+            userId: user?.id || "system",
+            userName: user?.name || "System",
+            userEmail: user?.email,
+            relatedProduct: id,
+            metadata: {
+              productName: formData.name,
+              sku: formData.sku,
+              quantityChange: quantityDiff,
+              previousQuantity: originalData.quantity,
+              newQuantity: parseInt(formData.quantity),
+            },
+          })
+        }
+      }
       
       toast({
         title: "Success",
@@ -181,7 +258,7 @@ export default function EditProduct({ params }: { params: Promise<{ id: string }
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">SKU *</label>
-                <Input name="sku" value={formData.sku} onChange={handleChange} required />
+                <Input name="sku" value={formData.sku} onChange={handleChange} required/>
               </div>
             </div>
 

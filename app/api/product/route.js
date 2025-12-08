@@ -3,6 +3,7 @@ import _db from "@/lib/utils/db";
 import Product from "@/models/product.model";
 import Category from "@/models/category.model";
 import UnitType from "@/models/unitType.model";
+import Movement from "@/models/movement.model";
 
 // GET - Fetch all products
 export async function GET(request) {
@@ -139,6 +140,37 @@ export async function POST(request) {
     const populatedProduct = await Product.findById(product._id)
       .populate("category", "name")
       .populate("unitType", "name abbreviation");
+    
+    // Log movement
+    try {
+      await Movement.create({
+        eventType: "product.created",
+        eventTitle: "Product Created",
+        description: `Created new product: ${populatedProduct.name} (SKU: ${populatedProduct.sku})`,
+        userId: body.userId || "system",
+        userName: body.userName || "System",
+        userEmail: body.userEmail,
+        relatedProduct: populatedProduct._id,
+        metadata: {
+          sku: populatedProduct.sku,
+          quantity: populatedProduct.quantity,
+          category: populatedProduct.category?.name,
+          supplier: populatedProduct.supplier,
+        },
+        changes: {
+          after: {
+            name: populatedProduct.name,
+            sku: populatedProduct.sku,
+            quantity: populatedProduct.quantity,
+            costPrice: populatedProduct.costPrice,
+            sellingPrice: populatedProduct.sellingPrice,
+          },
+        },
+      });
+    } catch (logError) {
+      console.error("Error logging movement:", logError);
+      // Don't fail the request if logging fails
+    }
     
     return NextResponse.json(
       {

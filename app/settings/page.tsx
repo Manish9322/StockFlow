@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation"
 import { useGetCategoriesQuery, useAddCategoryMutation, useUpdateCategoryMutation, useDeleteCategoryMutation, useGetUnitTypesQuery, useAddUnitTypeMutation, useUpdateUnitTypeMutation, useDeleteUnitTypeMutation } from "@/lib/utils/services/api"
 import { toast } from "sonner"
 import { Eye, Pencil, Trash2, Plus } from "lucide-react"
+import { logMovement } from "@/lib/movement-logger"
 
 interface Category {
   _id: string
@@ -139,31 +140,130 @@ function SettingsContent() {
     setSettings((prev) => ({ ...prev, [key]: value }))
   }
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
+    const originalProfile = {
+      name: user?.name || "",
+      email: user?.email || "",
+      company: user?.company || "",
+    }
+    
+    const changedFields = []
+    if (originalProfile.name !== profile.name) changedFields.push('name')
+    if (originalProfile.email !== profile.email) changedFields.push('email')
+    if (originalProfile.company !== profile.company) changedFields.push('company')
+    
+    if (changedFields.length > 0) {
+      await logMovement({
+        eventType: "settings.changed",
+        eventTitle: "Profile Updated",
+        description: `Updated profile settings (${changedFields.join(', ')})`,
+        userId: user?.id || "system",
+        userName: user?.name || "System",
+        userEmail: user?.email,
+        metadata: {
+          section: "profile",
+          changedFields,
+        },
+        changes: {
+          before: originalProfile,
+          after: profile,
+        },
+      })
+    }
+    
+    toast.success("Profile updated successfully")
     console.log("[v0] Profile updated:", profile)
   }
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     if (password.new !== password.confirm) {
-      alert("Passwords do not match")
+      toast.error("Passwords do not match")
       return
     }
+    
+    await logMovement({
+      eventType: "settings.changed",
+      eventTitle: "Password Changed",
+      description: "User changed their password",
+      userId: user?.id || "system",
+      userName: user?.name || "System",
+      userEmail: user?.email,
+      metadata: {
+        section: "security",
+        action: "password_change",
+      },
+    })
+    
+    toast.success("Password changed successfully")
     console.log("[v0] Password changed")
     setPassword({ current: "", new: "", confirm: "" })
   }
 
-  const handleSaveSettings = () => {
+  const handleSaveSettings = async () => {
+    const originalSettings = {
+      lowStockThreshold: 10,
+      currency: "INR",
+      timezone: "UTC",
+      darkMode: false,
+      emailNotifications: true,
+      weeklyReports: true,
+    }
+    
+    const changedFields = []
+    if (originalSettings.lowStockThreshold !== settings.lowStockThreshold) changedFields.push('low stock threshold')
+    if (originalSettings.currency !== settings.currency) changedFields.push('currency')
+    if (originalSettings.timezone !== settings.timezone) changedFields.push('timezone')
+    if (originalSettings.darkMode !== settings.darkMode) changedFields.push('dark mode')
+    if (originalSettings.emailNotifications !== settings.emailNotifications) changedFields.push('email notifications')
+    if (originalSettings.weeklyReports !== settings.weeklyReports) changedFields.push('weekly reports')
+    
+    if (changedFields.length > 0) {
+      await logMovement({
+        eventType: "settings.changed",
+        eventTitle: "Settings Updated",
+        description: `Updated application settings (${changedFields.join(', ')})`,
+        userId: user?.id || "system",
+        userName: user?.name || "System",
+        userEmail: user?.email,
+        metadata: {
+          section: "general_settings",
+          changedFields,
+        },
+        changes: {
+          before: originalSettings,
+          after: settings,
+        },
+      })
+    }
+    
+    toast.success("Settings saved successfully")
     console.log("[v0] Settings saved:", settings)
   }
 
   const handleAddCategory = async () => {
     if (formData.name.trim()) {
       try {
-        await addCategory({
+        const result = await addCategory({
           name: formData.name,
           description: formData.description,
           status: formData.status,
         }).unwrap()
+        
+        // Log movement
+        await logMovement({
+          eventType: "category.created",
+          eventTitle: "Category Created",
+          description: `Created new category: ${formData.name}`,
+          userId: user?.id || "system",
+          userName: user?.name || "System",
+          userEmail: user?.email,
+          relatedCategory: result.data?._id,
+          metadata: {
+            categoryName: formData.name,
+            description: formData.description,
+            status: formData.status,
+          },
+        })
         
         toast.success("Category added successfully")
         setFormData({ name: "", description: "", status: "active" })
@@ -177,12 +277,46 @@ function SettingsContent() {
   const handleUpdateCategory = async () => {
     if (selectedCategory && formData.name.trim()) {
       try {
+        const changedFields = []
+        if (selectedCategory.name !== formData.name) changedFields.push('name')
+        if (selectedCategory.description !== formData.description) changedFields.push('description')
+        if (selectedCategory.status !== formData.status) changedFields.push('status')
+        
         await updateCategory({
           id: selectedCategory._id,
           name: formData.name,
           description: formData.description,
           status: formData.status,
         }).unwrap()
+        
+        // Log movement
+        if (changedFields.length > 0) {
+          await logMovement({
+            eventType: "category.updated",
+            eventTitle: "Category Updated",
+            description: `Updated category "${formData.name}" (${changedFields.join(', ')})`,
+            userId: user?.id || "system",
+            userName: user?.name || "System",
+            userEmail: user?.email,
+            relatedCategory: selectedCategory._id,
+            metadata: {
+              categoryName: formData.name,
+              changedFields,
+            },
+            changes: {
+              before: {
+                name: selectedCategory.name,
+                description: selectedCategory.description,
+                status: selectedCategory.status,
+              },
+              after: {
+                name: formData.name,
+                description: formData.description,
+                status: formData.status,
+              },
+            },
+          })
+        }
         
         toast.success("Category updated successfully")
         setFormData({ name: "", description: "", status: "active" })
@@ -202,7 +336,33 @@ function SettingsContent() {
   const confirmDeleteCategory = async () => {
     if (categoryToDelete) {
       try {
+        const categoryToDeleteObj = categories.find((c: Category) => c._id === categoryToDelete)
+        
         await deleteCategory(categoryToDelete).unwrap()
+        
+        // Log movement
+        if (categoryToDeleteObj) {
+          await logMovement({
+            eventType: "category.deleted",
+            eventTitle: "Category Deleted",
+            description: `Deleted category: ${categoryToDeleteObj.name}`,
+            userId: user?.id || "system",
+            userName: user?.name || "System",
+            userEmail: user?.email,
+            metadata: {
+              categoryName: categoryToDeleteObj.name,
+              description: categoryToDeleteObj.description,
+            },
+            changes: {
+              before: {
+                name: categoryToDeleteObj.name,
+                description: categoryToDeleteObj.description,
+                status: categoryToDeleteObj.status,
+              },
+            },
+          })
+        }
+        
         toast.success("Category deleted successfully")
         setShowDeleteCategoryModal(false)
         setCategoryToDelete(null)
@@ -236,12 +396,28 @@ function SettingsContent() {
   const handleAddUnitType = async () => {
     if (unitFormData.name.trim() && unitFormData.abbreviation.trim()) {
       try {
-        await addUnitType({
+        const result = await addUnitType({
           name: unitFormData.name,
           abbreviation: unitFormData.abbreviation,
           description: unitFormData.description,
           status: unitFormData.status,
         }).unwrap()
+        
+        // Log movement
+        await logMovement({
+          eventType: "settings.changed",
+          eventTitle: "Unit Type Created",
+          description: `Created new unit type: ${unitFormData.name} (${unitFormData.abbreviation})`,
+          userId: user?.id || "system",
+          userName: user?.name || "System",
+          userEmail: user?.email,
+          metadata: {
+            section: "unit_types",
+            action: "create",
+            unitTypeName: unitFormData.name,
+            abbreviation: unitFormData.abbreviation,
+          },
+        })
         
         toast.success("Unit type added successfully")
         setUnitFormData({ name: "", abbreviation: "", description: "", status: "active" })
@@ -255,6 +431,12 @@ function SettingsContent() {
   const handleUpdateUnitType = async () => {
     if (selectedUnitType && unitFormData.name.trim() && unitFormData.abbreviation.trim()) {
       try {
+        const changedFields = []
+        if (selectedUnitType.name !== unitFormData.name) changedFields.push('name')
+        if (selectedUnitType.abbreviation !== unitFormData.abbreviation) changedFields.push('abbreviation')
+        if (selectedUnitType.description !== unitFormData.description) changedFields.push('description')
+        if (selectedUnitType.status !== unitFormData.status) changedFields.push('status')
+        
         await updateUnitType({
           id: selectedUnitType._id,
           name: unitFormData.name,
@@ -262,6 +444,38 @@ function SettingsContent() {
           description: unitFormData.description,
           status: unitFormData.status,
         }).unwrap()
+        
+        // Log movement
+        if (changedFields.length > 0) {
+          await logMovement({
+            eventType: "settings.changed",
+            eventTitle: "Unit Type Updated",
+            description: `Updated unit type "${unitFormData.name}" (${changedFields.join(', ')})`,
+            userId: user?.id || "system",
+            userName: user?.name || "System",
+            userEmail: user?.email,
+            metadata: {
+              section: "unit_types",
+              action: "update",
+              unitTypeName: unitFormData.name,
+              changedFields,
+            },
+            changes: {
+              before: {
+                name: selectedUnitType.name,
+                abbreviation: selectedUnitType.abbreviation,
+                description: selectedUnitType.description,
+                status: selectedUnitType.status,
+              },
+              after: {
+                name: unitFormData.name,
+                abbreviation: unitFormData.abbreviation,
+                description: unitFormData.description,
+                status: unitFormData.status,
+              },
+            },
+          })
+        }
         
         toast.success("Unit type updated successfully")
         setUnitFormData({ name: "", abbreviation: "", description: "", status: "active" })
@@ -281,7 +495,36 @@ function SettingsContent() {
   const confirmDeleteUnitType = async () => {
     if (unitTypeToDelete) {
       try {
+        const unitTypeToDeleteObj = unitTypes.find((u: UnitType) => u._id === unitTypeToDelete)
+        
         await deleteUnitType(unitTypeToDelete).unwrap()
+        
+        // Log movement
+        if (unitTypeToDeleteObj) {
+          await logMovement({
+            eventType: "settings.changed",
+            eventTitle: "Unit Type Deleted",
+            description: `Deleted unit type: ${unitTypeToDeleteObj.name} (${unitTypeToDeleteObj.abbreviation})`,
+            userId: user?.id || "system",
+            userName: user?.name || "System",
+            userEmail: user?.email,
+            metadata: {
+              section: "unit_types",
+              action: "delete",
+              unitTypeName: unitTypeToDeleteObj.name,
+              abbreviation: unitTypeToDeleteObj.abbreviation,
+            },
+            changes: {
+              before: {
+                name: unitTypeToDeleteObj.name,
+                abbreviation: unitTypeToDeleteObj.abbreviation,
+                description: unitTypeToDeleteObj.description,
+                status: unitTypeToDeleteObj.status,
+              },
+            },
+          })
+        }
+        
         toast.success("Unit type deleted successfully")
         setShowDeleteUnitTypeModal(false)
         setUnitTypeToDelete(null)

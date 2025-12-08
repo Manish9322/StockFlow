@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import _db from "@/lib/utils/db";
 import Product from "@/models/product.model";
+import Movement from "@/models/movement.model";
 
 // GET - Fetch single product by ID
 export async function GET(request, { params }) {
@@ -77,6 +78,15 @@ export async function PUT(request, { params }) {
       }
     }
     
+    // Store old values for change tracking
+    const oldProduct = {
+      name: existingProduct.name,
+      sku: existingProduct.sku,
+      quantity: existingProduct.quantity,
+      costPrice: existingProduct.costPrice,
+      sellingPrice: existingProduct.sellingPrice,
+    };
+    
     // Update product
     const updatedProduct = await Product.findByIdAndUpdate(
       id,
@@ -88,6 +98,45 @@ export async function PUT(request, { params }) {
     )
       .populate("category", "name")
       .populate("unitType", "name abbreviation");
+    
+    // Detect what changed
+    const changes = [];
+    if (oldProduct.name !== updatedProduct.name) changes.push(`name: "${oldProduct.name}" → "${updatedProduct.name}"`);
+    if (oldProduct.sku !== updatedProduct.sku) changes.push(`SKU: "${oldProduct.sku}" → "${updatedProduct.sku}"`);
+    if (oldProduct.quantity !== updatedProduct.quantity) changes.push(`quantity: ${oldProduct.quantity} → ${updatedProduct.quantity}`);
+    if (oldProduct.costPrice !== updatedProduct.costPrice) changes.push(`cost price: $${oldProduct.costPrice} → $${updatedProduct.costPrice}`);
+    if (oldProduct.sellingPrice !== updatedProduct.sellingPrice) changes.push(`selling price: $${oldProduct.sellingPrice} → $${updatedProduct.sellingPrice}`);
+    
+    // Log movement
+    try {
+      const changeDescription = changes.length > 0 ? ` (${changes.join(", ")})` : "";
+      await Movement.create({
+        eventType: "product.updated",
+        eventTitle: "Product Updated",
+        description: `Updated product: ${updatedProduct.name}${changeDescription}`,
+        userId: body.userId || "system",
+        userName: body.userName || "System",
+        userEmail: body.userEmail,
+        relatedProduct: updatedProduct._id,
+        metadata: {
+          sku: updatedProduct.sku,
+          changedFields: changes,
+        },
+        changes: {
+          before: oldProduct,
+          after: {
+            name: updatedProduct.name,
+            sku: updatedProduct.sku,
+            quantity: updatedProduct.quantity,
+            costPrice: updatedProduct.costPrice,
+            sellingPrice: updatedProduct.sellingPrice,
+          },
+        },
+      });
+    } catch (logError) {
+      console.error("Error logging movement:", logError);
+      // Don't fail the request if logging fails
+    }
     
     return NextResponse.json({
       success: true,
@@ -124,8 +173,15 @@ export async function DELETE(request, { params }) {
     await _db();
     
     const { id } = await params;
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get("userId") || "system";
+    const userName = searchParams.get("userName") || "System";
+    const userEmail = searchParams.get("userEmail");
     
-    const product = await Product.findById(id);
+    const product = await Product.findById(id)
+      .populate("category", "name")
+      .populate("unitType", "name abbreviation");
+      
     if (!product) {
       return NextResponse.json(
         {
@@ -136,7 +192,39 @@ export async function DELETE(request, { params }) {
       );
     }
     
+    // Store product info before deletion for logging
+    const productInfo = {
+      name: product.name,
+      sku: product.sku,
+      quantity: product.quantity,
+      category: product.category?.name,
+    };
+    
     await Product.findByIdAndDelete(id);
+    
+    // Log movement
+    try {
+      await Movement.create({
+        eventType: "product.deleted",
+        eventTitle: "Product Deleted",
+        description: `Deleted product: ${productInfo.name} (SKU: ${productInfo.sku})`,
+        userId,
+        userName,
+        userEmail,
+        metadata: {
+          productName: productInfo.name,
+          sku: productInfo.sku,
+          quantity: productInfo.quantity,
+          category: productInfo.category,
+        },
+        changes: {
+          before: productInfo,
+        },
+      });
+    } catch (logError) {
+      console.error("Error logging movement:", logError);
+      // Don't fail the request if logging fails
+    }
     
     return NextResponse.json({
       success: true,
