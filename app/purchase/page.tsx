@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useLanguage } from "@/lib/language-context"
 import { useAuth } from "@/lib/auth-context"
 import { logEvent } from "@/lib/event-logger"
-import { Download, Plus, Trash2 } from "lucide-react"
+import { Download, Plus, Trash2, Building2 } from "lucide-react"
 import { toast } from "sonner"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
@@ -218,19 +218,56 @@ function PurchaseContent() {
       setIsDownloading(true)
       toast.loading("Generating PDF...")
 
-      // Wait a bit for the modal to fully render
-      await new Promise((resolve) => setTimeout(resolve, 100))
+      // Wait for the modal to fully render
+      await new Promise((resolve) => setTimeout(resolve, 500))
 
       // Get the invoice element
       const invoiceElement = invoiceRef.current
 
-      // Convert HTML to canvas
+      if (!invoiceElement) {
+        throw new Error("Invoice element not found")
+      }
+
+      // Suppress console warnings from html2canvas
+      const originalWarn = console.warn
+      const originalError = console.error
+      console.warn = () => {}
+      console.error = (...args) => {
+        // Only suppress color parsing errors
+        const msg = args[0]
+        if (typeof msg === 'string' && msg.includes('color')) return
+        originalError.apply(console, args)
+      }
+
+      // Convert HTML to canvas with enhanced options
       const canvas = await html2canvas(invoiceElement, {
         scale: 2,
         useCORS: true,
+        allowTaint: true,
         logging: false,
         backgroundColor: "#ffffff",
+        windowWidth: invoiceElement.scrollWidth,
+        windowHeight: invoiceElement.scrollHeight,
+        ignoreElements: (element) => {
+          // Ignore elements that might cause color parsing issues
+          return element.classList?.contains('dark') || false
+        },
+        onclone: (clonedDoc) => {
+          // Remove any problematic CSS variables or color functions
+          const clonedElement = clonedDoc.querySelector('[ref]') || clonedDoc.body
+          if (clonedElement instanceof HTMLElement) {
+            clonedElement.style.colorScheme = 'light'
+          }
+        }
       })
+
+      // Restore console methods
+      console.warn = originalWarn
+      console.error = originalError
+
+      if (!canvas) {
+        throw new Error("Failed to create canvas")
+      }
 
       // Calculate PDF dimensions
       const imgWidth = 210 // A4 width in mm
@@ -238,7 +275,7 @@ function PurchaseContent() {
 
       // Create PDF
       const pdf = new jsPDF({
-        orientation: imgHeight > imgWidth ? "portrait" : "portrait",
+        orientation: "portrait",
         unit: "mm",
         format: "a4",
       })
@@ -255,7 +292,8 @@ function PurchaseContent() {
     } catch (error) {
       console.error("Error generating PDF:", error)
       toast.dismiss()
-      toast.error("Failed to generate PDF")
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
+      toast.error(`Failed to generate PDF: ${errorMessage}`)
     } finally {
       setIsDownloading(false)
     }
@@ -467,144 +505,113 @@ function PurchaseContent() {
       {/* Invoice Modal */}
       {showInvoiceModal && generatedInvoice && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div ref={invoiceRef}>
-              {/* Invoice Header */}
-              <div className="bg-primary text-primary-foreground px-8 py-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h1 className="text-3xl font-bold">PURCHASE INVOICE</h1>
-                    <p className="text-sm opacity-90 mt-1">Stock-Flow Inventory System</p>
+          <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+            <div className="bg-white text-black p-4 sm:p-6 overflow-y-auto">
+              <div ref={invoiceRef}>
+                {/* Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #eee', paddingBottom: '1rem', marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Building2 className="h-8 w-8" style={{ color: '#000' }}/>
+                    <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: 0 }}>Stock-Flow</h1>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium">Invoice #</p>
-                    <p className="text-lg font-bold">{generatedInvoice.invoiceNumber}</p>
+                  <div style={{ textAlign: 'right', fontSize: '0.8rem', color: '#555' }}>
+                    <p style={{ margin: 0 }}>Inventory Management</p>
+                    <p style={{ margin: 0 }}>Stock-Flow System</p>
                   </div>
                 </div>
-              </div>
 
-            {/* Invoice Body */}
-            <div className="px-8 py-6">
-              {/* Date and Info Section */}
-              <div className="grid grid-cols-2 gap-8 mb-8">
-                <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Invoice Details</h3>
-                  <div className="space-y-1">
-                    <p className="text-sm">
-                      <span className="font-medium">Date:</span> {generatedInvoice.date}
-                    </p>
-                    <p className="text-sm">
-                      <span className="font-medium">Time:</span> {generatedInvoice.time}
-                    </p>
-                    <p className="text-sm">
-                      <span className="font-medium">Payment Method:</span> {generatedInvoice.paymentMethod}
-                    </p>
-                  </div>
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Supplier Information</h3>
-                  <div className="space-y-1">
-                    <p className="text-sm">
-                      <span className="font-medium">Supplier:</span> {generatedInvoice.supplier}
-                    </p>
-                    {cartSuppliers.length > 1 && (
-                      <div className="mt-2">
-                        <p className="text-xs text-muted-foreground mb-1">Product Suppliers:</p>
-                        <div className="flex flex-wrap gap-1">
-                          {cartSuppliers.map((supplier, index) => (
-                            <span
-                              key={index}
-                              className="inline-flex items-center px-2 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-medium"
-                            >
-                              {supplier}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Items Table */}
-              <div className="mb-8">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-3">Items</h3>
-                <div className="border border-border rounded-lg overflow-hidden">
-                  <table className="w-full">
-                    <thead className="bg-muted">
+                {/* Payment Receipt Title and Details */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: '600', borderBottom: '1px solid #eee', paddingBottom: '0.5rem', marginBottom: '1rem' }}>Purchase Invoice</h2>
+                  <table style={{ width: '100%', fontSize: '0.9rem' }}>
+                    <tbody>
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-foreground uppercase">#</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-foreground uppercase">Product</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-foreground uppercase">SKU</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-foreground uppercase">Supplier</th>
-                        <th className="px-4 py-3 text-right text-xs font-semibold text-foreground uppercase">Qty</th>
-                        <th className="px-4 py-3 text-right text-xs font-semibold text-foreground uppercase">Unit Price</th>
-                        <th className="px-4 py-3 text-right text-xs font-semibold text-foreground uppercase">Subtotal</th>
+                        <td style={{ padding: '0.5rem', fontWeight: '600' }}>Supplier:</td>
+                        <td style={{ padding: '0.5rem' }}>{generatedInvoice.supplier}</td>
+                        <td style={{ padding: '0.5rem', fontWeight: '600' }}>Invoice Date:</td>
+                        <td style={{ padding: '0.5rem' }}>{generatedInvoice.date}</td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {generatedInvoice.items.map((item: CartItem, index: number) => (
-                        <tr key={item.id} className="hover:bg-muted/50">
-                          <td className="px-4 py-3 text-sm text-foreground">{index + 1}</td>
-                          <td className="px-4 py-3">
-                            <p className="text-sm font-medium text-foreground">{item.product.name}</p>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-muted-foreground">{item.product.sku}</td>
-                          <td className="px-4 py-3 text-sm text-muted-foreground">{item.product.supplier}</td>
-                          <td className="px-4 py-3 text-sm text-right text-foreground">{item.quantity}</td>
-                          <td className="px-4 py-3 text-sm text-right text-foreground">
-                            ₹{item.product.costPrice.toFixed(2)}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-right font-medium text-foreground">
-                            ₹{(item.quantity * item.product.costPrice).toFixed(2)}
-                          </td>
-                        </tr>
-                      ))}
+                      <tr>
+                        <td style={{ padding: '0.5rem', fontWeight: '600' }}>Payment Method:</td>
+                        <td style={{ padding: '0.5rem' }}>{generatedInvoice.paymentMethod}</td>
+                        <td style={{ padding: '0.5rem', fontWeight: '600' }}>Time:</td>
+                        <td style={{ padding: '0.5rem' }}>{generatedInvoice.time}</td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: '0.5rem', fontWeight: '600' }}>Invoice Number:</td>
+                        <td colSpan={3} style={{ padding: '0.5rem', fontFamily: 'monospace' }}>{generatedInvoice.invoiceNumber}</td>
+                      </tr>
                     </tbody>
                   </table>
                 </div>
-              </div>
 
-              {/* Totals Section */}
-              <div className="flex justify-end mb-6">
-                <div className="w-full max-w-sm space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Subtotal:</span>
-                    <span className="font-medium">₹{generatedInvoice.subtotal}</span>
+                {/* Items Table */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '1rem' }}>Purchase Details</h3>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                    <thead style={{ backgroundColor: '#f9fafb' }}>
+                      <tr>
+                        <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #eee' }}>Product</th>
+                        <th style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #eee' }}>Qty</th>
+                        <th style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>Unit Price</th>
+                        <th style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {generatedInvoice.items.map((item: CartItem) => (
+                        <tr key={item.id}>
+                          <td style={{ padding: '0.75rem', border: '1px solid #eee' }}>
+                            <div>
+                              <div style={{ fontWeight: '500' }}>{item.product.name}</div>
+                              <div style={{ fontSize: '0.8rem', color: '#666' }}>SKU: {item.product.sku}</div>
+                            </div>
+                          </td>
+                          <td style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #eee' }}>{item.quantity}</td>
+                          <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹{item.product.costPrice.toLocaleString()}</td>
+                          <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹{(item.quantity * item.product.costPrice).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ fontWeight: 'bold' }}>
+                        <td colSpan={3} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>Subtotal</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹{generatedInvoice.subtotal}</td>
+                      </tr>
+                      <tr style={{ fontWeight: 'bold' }}>
+                        <td colSpan={3} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>Tax (0%)</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹{generatedInvoice.tax}</td>
+                      </tr>
+                      <tr style={{ fontWeight: 'bold', backgroundColor: '#f9fafb' }}>
+                        <td colSpan={3} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>Total Amount</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹{generatedInvoice.total}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                {/* Notes Section */}
+                {generatedInvoice.notes && (
+                  <div style={{ marginBottom: '1.5rem', padding: '0.75rem', backgroundColor: '#f9fafb', border: '1px solid #eee', borderRadius: '0.25rem' }}>
+                    <h3 style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '0.5rem' }}>Notes:</h3>
+                    <p style={{ fontSize: '0.85rem', color: '#555', margin: 0 }}>{generatedInvoice.notes}</p>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Tax (0%):</span>
-                    <span className="font-medium">₹{generatedInvoice.tax}</span>
+                )}
+
+                {/* Footer */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', paddingTop: '1.5rem', borderTop: '2px solid #eee' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#555' }}>
+                    <p style={{ margin: 0 }}>Thank you for your purchase!</p>
+                    <p style={{ margin: 0 }}>This is a computer-generated invoice and does not require a signature.</p>
                   </div>
-                  <div className="border-t border-border pt-2 flex justify-between">
-                    <span className="text-lg font-bold text-foreground">Total Amount:</span>
-                    <span className="text-2xl font-bold text-primary">₹{generatedInvoice.total}</span>
+                  <div style={{ border: '3px solid #22c55e', color: '#22c55e', padding: '0.5rem 1rem', borderRadius: '0.25rem', transform: 'rotate(-10deg)', fontWeight: 'bold', fontSize: '1.5rem' }}>
+                    PAID
                   </div>
                 </div>
               </div>
-
-              {/* Notes Section */}
-              {generatedInvoice.notes && (
-                <div className="border-t border-border pt-4">
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Notes</h3>
-                  <p className="text-sm text-foreground">{generatedInvoice.notes}</p>
-                </div>
-              )}
-
-              {/* Footer */}
-              <div className="border-t border-border pt-6 mt-6">
-                <p className="text-xs text-center text-muted-foreground">
-                  This is a computer-generated invoice and does not require a signature.
-                </p>
-                <p className="text-xs text-center text-muted-foreground mt-1">
-                  Generated on {new Date().toLocaleString()}
-                </p>
-              </div>
-            </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="bg-muted px-8 py-4 flex gap-3">
+            <div className="mt-auto pt-4 border-t px-4 sm:px-6 pb-4 flex gap-3">
               <Button
                 onClick={() => setShowInvoiceModal(false)}
                 variant="outline"
@@ -617,8 +624,8 @@ function PurchaseContent() {
                 disabled={isDownloading}
                 className="flex-1 flex items-center justify-center gap-2"
               >
-                <Download size={16} />
-                {isDownloading ? "Generating PDF..." : "Download Invoice"}
+                <Download className="mr-2 h-4 w-4" />
+                {isDownloading ? "Generating PDF..." : "Print / Download"}
               </Button>
             </div>
           </div>

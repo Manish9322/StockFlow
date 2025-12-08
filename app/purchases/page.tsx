@@ -1,13 +1,15 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import MainLayout from "@/components/layout/main-layout"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useLanguage } from "@/lib/language-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Download, Eye, Pencil, Trash2, ShoppingCart, DollarSign, Package, TrendingUp } from "lucide-react"
+import { Download, Eye, Pencil, Trash2, ShoppingCart, DollarSign, Package, TrendingUp, FileText, Building2 } from "lucide-react"
 import { toast } from "sonner"
+import jsPDF from "jspdf"
+import html2canvas from "html2canvas"
 
 interface PurchaseItem {
   product: any
@@ -41,6 +43,9 @@ function PurchasesContent() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [purchaseToDelete, setPurchaseToDelete] = useState<string | null>(null)
   const [editFormData, setEditFormData] = useState<any>({})
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false)
+  const [isDownloading, setIsDownloading] = useState(false)
+  const invoiceRef = useRef<HTMLDivElement>(null)
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -250,6 +255,133 @@ function PurchasesContent() {
         return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
       default:
         return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+    }
+  }
+
+  const openInvoiceModal = (purchase: Purchase) => {
+    setSelectedPurchase(purchase)
+    setShowInvoiceModal(true)
+  }
+
+  const handleDownloadInvoice = async () => {
+    if (!selectedPurchase || !invoiceRef.current) {
+      toast.error("Please select a purchase first")
+      return
+    }
+
+    setIsDownloading(true)
+    const loadingToastId = toast.loading("Generating PDF...")
+
+    try {
+      // Wait for modal content to be fully rendered
+      await new Promise((resolve) => setTimeout(resolve, 300))
+
+      const invoiceElement = invoiceRef.current
+
+      if (!invoiceElement) {
+        throw new Error("Invoice element not found")
+      }
+
+      // Temporarily make the modal content visible for capture
+      const originalDisplay = invoiceElement.style.display
+      invoiceElement.style.display = 'block'
+
+      // Suppress console warnings from html2canvas
+      const originalWarn = console.warn
+      const originalError = console.error
+      console.warn = () => {}
+      console.error = (...args) => {
+        // Only suppress color parsing errors
+        const msg = args[0]
+        if (typeof msg === 'string' && msg.includes('color')) return
+        originalError.apply(console, args)
+      }
+
+      // Convert HTML to canvas with optimized settings
+      const canvas = await html2canvas(invoiceElement, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+        width: invoiceElement.scrollWidth,
+        height: invoiceElement.scrollHeight,
+        windowWidth: invoiceElement.scrollWidth,
+        windowHeight: invoiceElement.scrollHeight,
+        scrollX: 0,
+        scrollY: 0,
+        x: 0,
+        y: 0,
+        ignoreElements: (element) => {
+          // Ignore elements that might cause color parsing issues
+          return element.classList?.contains('dark') || false
+        },
+        onclone: (clonedDoc) => {
+          // Remove any problematic CSS variables or color functions
+          const clonedElement = clonedDoc.querySelector('[ref]') || clonedDoc.body
+          if (clonedElement instanceof HTMLElement) {
+            clonedElement.style.colorScheme = 'light'
+          }
+        }
+      })
+
+      // Restore console methods
+      console.warn = originalWarn
+      console.error = originalError
+
+      // Restore original display
+      invoiceElement.style.display = originalDisplay
+
+      if (!canvas || canvas.width === 0 || canvas.height === 0) {
+        throw new Error("Failed to create canvas from invoice")
+      }
+
+      // Get canvas dimensions
+      const canvasWidth = canvas.width
+      const canvasHeight = canvas.height
+
+      // Calculate PDF dimensions (A4: 210mm x 297mm)
+      const pdfWidth = 210
+      const pdfHeight = (canvasHeight * pdfWidth) / canvasWidth
+
+      // Create PDF instance
+      const pdf = new jsPDF({
+        orientation: pdfHeight > 297 ? "portrait" : "portrait",
+        unit: "mm",
+        format: "a4",
+      })
+
+      // Convert canvas to image data
+      const imgData = canvas.toDataURL("image/png", 1.0)
+
+      // Add image to PDF with proper dimensions
+      if (pdfHeight > 297) {
+        // If content is longer than one page, fit to width
+        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight)
+      } else {
+        // Fit content on single page
+        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight)
+      }
+
+      // Generate filename with purchase ID
+      const filename = `purchase-invoice-${selectedPurchase.purchaseId}.pdf`
+
+      // Save the PDF
+      pdf.save(filename)
+
+      toast.dismiss(loadingToastId)
+      toast.success("Invoice downloaded successfully!")
+    } catch (error) {
+      console.error("Error generating PDF:", error)
+      toast.dismiss(loadingToastId)
+      
+      if (error instanceof Error) {
+        toast.error(`Failed to generate PDF: ${error.message}`)
+      } else {
+        toast.error("Failed to generate PDF. Please try again.")
+      }
+    } finally {
+      setIsDownloading(false)
     }
   }
 
@@ -487,6 +619,13 @@ function PurchasesContent() {
                               title="View"
                             >
                               <Eye className="w-4 h-4 text-muted-foreground" />
+                            </button>
+                            <button
+                              onClick={() => openInvoiceModal(purchase)}
+                              className="p-1.5 hover:bg-muted rounded transition-colors"
+                              title="View Invoice"
+                            >
+                              <FileText className="w-4 h-4 text-muted-foreground" />
                             </button>
                             <button
                               onClick={() => openEditModal(purchase)}
@@ -819,6 +958,139 @@ function PurchasesContent() {
               </Button>
               <Button variant="destructive" onClick={confirmDelete} className="flex-1">
                 Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Invoice Modal */}
+      {showInvoiceModal && selectedPurchase && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+            <div className="bg-white text-black p-4 sm:p-6 overflow-y-auto">
+              <div ref={invoiceRef}>
+                {/* Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #eee', paddingBottom: '1rem', marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Building2 className="h-8 w-8" style={{ color: '#000' }}/>
+                    <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: 0 }}>Stock-Flow</h1>
+                  </div>
+                  <div style={{ textAlign: 'right', fontSize: '0.8rem', color: '#555' }}>
+                    <p style={{ margin: 0 }}>Inventory Management</p>
+                    <p style={{ margin: 0 }}>Stock-Flow System</p>
+                  </div>
+                </div>
+
+                {/* Payment Receipt Title and Details */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: '600', borderBottom: '1px solid #eee', paddingBottom: '0.5rem', marginBottom: '1rem' }}>Purchase Invoice</h2>
+                  <table style={{ width: '100%', fontSize: '0.9rem' }}>
+                    <tbody>
+                      <tr>
+                        <td style={{ padding: '0.5rem', fontWeight: '600' }}>Supplier:</td>
+                        <td style={{ padding: '0.5rem' }}>{selectedPurchase.supplier}</td>
+                        <td style={{ padding: '0.5rem', fontWeight: '600' }}>Invoice Date:</td>
+                        <td style={{ padding: '0.5rem' }}>{new Date(selectedPurchase.date).toLocaleDateString()}</td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: '0.5rem', fontWeight: '600' }}>Payment Method:</td>
+                        <td style={{ padding: '0.5rem' }}>{selectedPurchase.paymentMethod}</td>
+                        <td style={{ padding: '0.5rem', fontWeight: '600' }}>Time:</td>
+                        <td style={{ padding: '0.5rem' }}>{new Date(selectedPurchase.date).toLocaleTimeString()}</td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: '0.5rem', fontWeight: '600' }}>Invoice Number:</td>
+                        <td colSpan={3} style={{ padding: '0.5rem', fontFamily: 'monospace' }}>{selectedPurchase.purchaseId}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Items Table */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '1rem' }}>Purchase Details</h3>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                    <thead style={{ backgroundColor: '#f9fafb' }}>
+                      <tr>
+                        <th style={{ padding: '0.75rem', textAlign: 'left', border: '1px solid #eee' }}>Product</th>
+                        <th style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #eee' }}>Qty</th>
+                        <th style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>Unit Price</th>
+                        <th style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedPurchase.items.map((item, index) => (
+                        <tr key={index}>
+                          <td style={{ padding: '0.75rem', border: '1px solid #eee' }}>
+                            <div>
+                              <div style={{ fontWeight: '500' }}>{item.productName}</div>
+                              <div style={{ fontSize: '0.8rem', color: '#666' }}>SKU: {item.productSku}</div>
+                            </div>
+                          </td>
+                          <td style={{ padding: '0.75rem', textAlign: 'center', border: '1px solid #eee' }}>{item.quantity}</td>
+                          <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹{item.unitPrice.toLocaleString()}</td>
+                          <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹{item.subtotal.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ fontWeight: 'bold' }}>
+                        <td colSpan={3} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>Subtotal</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹{selectedPurchase.totalAmount.toLocaleString()}</td>
+                      </tr>
+                      <tr style={{ fontWeight: 'bold' }}>
+                        <td colSpan={3} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>Tax (0%)</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹0.00</td>
+                      </tr>
+                      <tr style={{ fontWeight: 'bold', backgroundColor: '#f9fafb' }}>
+                        <td colSpan={3} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>Total Amount</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹{selectedPurchase.totalAmount.toLocaleString()}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                {/* Notes Section */}
+                {selectedPurchase.notes && (
+                  <div style={{ marginBottom: '1.5rem', padding: '0.75rem', backgroundColor: '#f9fafb', border: '1px solid #eee', borderRadius: '0.25rem' }}>
+                    <h3 style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '0.5rem' }}>Notes:</h3>
+                    <p style={{ fontSize: '0.85rem', color: '#555', margin: 0 }}>{selectedPurchase.notes}</p>
+                  </div>
+                )}
+
+                {/* Footer */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', paddingTop: '1.5rem', borderTop: '2px solid #eee' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#555' }}>
+                    <p style={{ margin: 0 }}>Thank you for your purchase!</p>
+                    <p style={{ margin: 0 }}>This is a computer-generated invoice and does not require a signature.</p>
+                  </div>
+                  <div style={{ border: '3px solid #22c55e', color: '#22c55e', padding: '0.5rem 1rem', borderRadius: '0.25rem', transform: 'rotate(-10deg)', fontWeight: 'bold', fontSize: '1.5rem' }}>
+                    PAID
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="mt-auto pt-4 border-t px-4 sm:px-6 pb-4 flex gap-3">
+              <Button
+                onClick={() => {
+                  setShowInvoiceModal(false)
+                  setSelectedPurchase(null)
+                }}
+                variant="outline"
+                className="flex-1"
+              >
+                Close
+              </Button>
+              <Button
+                onClick={handleDownloadInvoice}
+                disabled={isDownloading}
+                className="flex-1 flex items-center justify-center gap-2"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                {isDownloading ? "Generating PDF..." : "Print / Download"}
               </Button>
             </div>
           </div>
