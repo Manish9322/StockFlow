@@ -25,6 +25,18 @@ interface Purchase {
   purchaseId: string
   date: string
   items: PurchaseItem[]
+  subtotal?: number
+  taxDetails?: {
+    gst: number
+    platformFee: number
+    otherTaxes: Array<{
+      name: string
+      rate: number
+      type: string
+      amount: number
+    }>
+    totalTax: number
+  }
   totalAmount: number
   status: string
   supplier: string
@@ -793,14 +805,56 @@ function PurchasesContent() {
                 <label className="block text-sm font-medium text-muted-foreground mb-1">Supplier</label>
                 <p className="text-sm text-foreground">{selectedPurchase.supplier}</p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">Total Items</label>
-                  <p className="text-sm text-foreground">{selectedPurchase.items.reduce((sum, item) => sum + item.quantity, 0)}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">Total Amount</label>
-                  <p className="text-sm text-foreground font-medium">₹{selectedPurchase.totalAmount.toFixed(2)}</p>
+              <div>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">Total Items</label>
+                <p className="text-sm text-foreground">{selectedPurchase.items.reduce((sum, item) => sum + item.quantity, 0)}</p>
+              </div>
+              
+              {/* Price Breakdown */}
+              <div className="border border-border rounded-md p-3 bg-muted/30 space-y-2">
+                <h3 className="text-sm font-semibold text-foreground mb-2">Price Breakdown</h3>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Subtotal:</span>
+                    <span className="font-medium">₹{(selectedPurchase.subtotal || selectedPurchase.totalAmount).toFixed(2)}</span>
+                  </div>
+                  
+                  {selectedPurchase.taxDetails?.gst && selectedPurchase.taxDetails.gst > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">GST:</span>
+                      <span className="font-medium">₹{selectedPurchase.taxDetails.gst.toFixed(2)}</span>
+                    </div>
+                  )}
+                  
+                  {selectedPurchase.taxDetails?.platformFee && selectedPurchase.taxDetails.platformFee > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Platform Fee:</span>
+                      <span className="font-medium">₹{selectedPurchase.taxDetails.platformFee.toFixed(2)}</span>
+                    </div>
+                  )}
+                  
+                  {selectedPurchase.taxDetails?.otherTaxes && selectedPurchase.taxDetails.otherTaxes.length > 0 && (
+                    <>
+                      {selectedPurchase.taxDetails.otherTaxes.map((tax, index) => (
+                        <div key={index} className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">{tax.name}:</span>
+                          <span className="font-medium">₹{tax.amount.toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                  
+                  {selectedPurchase.taxDetails?.totalTax && selectedPurchase.taxDetails.totalTax > 0 && (
+                    <div className="flex justify-between text-sm pt-2 border-t border-border">
+                      <span className="text-muted-foreground font-medium">Total Tax:</span>
+                      <span className="font-medium">₹{selectedPurchase.taxDetails.totalTax.toFixed(2)}</span>
+                    </div>
+                  )}
+                  
+                  <div className="flex justify-between text-sm pt-2 border-t border-border">
+                    <span className="font-semibold text-foreground">Grand Total:</span>
+                    <span className="font-bold text-primary">₹{selectedPurchase.totalAmount.toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
               <div>
@@ -1037,12 +1091,36 @@ function PurchasesContent() {
                     <tfoot>
                       <tr style={{ fontWeight: 'bold' }}>
                         <td colSpan={3} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>Subtotal</td>
-                        <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹{selectedPurchase.totalAmount.toLocaleString()}</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹{(selectedPurchase.subtotal || selectedPurchase.totalAmount).toLocaleString()}</td>
                       </tr>
-                      <tr style={{ fontWeight: 'bold' }}>
-                        <td colSpan={3} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>Tax (0%)</td>
-                        <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹0.00</td>
-                      </tr>
+                      {selectedPurchase.taxDetails?.gst && selectedPurchase.taxDetails.gst > 0 && (
+                        <tr>
+                          <td colSpan={3} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>GST</td>
+                          <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹{selectedPurchase.taxDetails.gst.toFixed(2)}</td>
+                        </tr>
+                      )}
+                      {selectedPurchase.taxDetails?.platformFee && selectedPurchase.taxDetails.platformFee > 0 && (
+                        <tr>
+                          <td colSpan={3} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>Platform Fee</td>
+                          <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹{selectedPurchase.taxDetails.platformFee.toFixed(2)}</td>
+                        </tr>
+                      )}
+                      {selectedPurchase.taxDetails?.otherTaxes && selectedPurchase.taxDetails.otherTaxes.length > 0 && (
+                        <>
+                          {selectedPurchase.taxDetails.otherTaxes.map((tax, index) => (
+                            <tr key={index}>
+                              <td colSpan={3} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>{tax.name}</td>
+                              <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹{tax.amount.toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </>
+                      )}
+                      {selectedPurchase.taxDetails?.totalTax && selectedPurchase.taxDetails.totalTax > 0 && (
+                        <tr style={{ fontWeight: 'bold' }}>
+                          <td colSpan={3} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>Total Tax</td>
+                          <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹{selectedPurchase.taxDetails.totalTax.toFixed(2)}</td>
+                        </tr>
+                      )}
                       <tr style={{ fontWeight: 'bold', backgroundColor: '#f9fafb' }}>
                         <td colSpan={3} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>Total Amount</td>
                         <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹{selectedPurchase.totalAmount.toLocaleString()}</td>

@@ -42,6 +42,8 @@ export async function POST(request) {
     const body = await request.json();
     const {
       items,
+      subtotal,
+      taxDetails,
       totalAmount,
       status,
       supplier,
@@ -106,14 +108,21 @@ export async function POST(request) {
         subtotal: subtotal,
       });
       
-      // Update product quantity
-      product.quantity += item.quantity;
+      // Update product quantity (subtract from stock)
+      product.quantity -= item.quantity;
       await product.save();
     }
     
     // Create purchase
     const purchase = new Purchase({
       items: preparedItems,
+      subtotal: subtotal || totalAmount,
+      taxDetails: taxDetails || {
+        gst: 0,
+        platformFee: 0,
+        otherTaxes: [],
+        totalTax: 0,
+      },
       totalAmount,
       status: status || "Completed",
       supplier: supplier || "N/A",

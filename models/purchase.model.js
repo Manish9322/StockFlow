@@ -44,6 +44,32 @@ const purchaseSchema = new mongoose.Schema(
         },
       },
     ],
+    subtotal: {
+      type: Number,
+      min: [0, "Subtotal must be positive"],
+    },
+    taxDetails: {
+      gst: {
+        type: Number,
+        default: 0,
+      },
+      platformFee: {
+        type: Number,
+        default: 0,
+      },
+      otherTaxes: [
+        {
+          name: String,
+          rate: Number,
+          type: String,
+          amount: Number,
+        },
+      ],
+      totalTax: {
+        type: Number,
+        default: 0,
+      },
+    },
     totalAmount: {
       type: Number,
       required: [true, "Total amount is required"],

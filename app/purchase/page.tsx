@@ -14,6 +14,8 @@ import { Download, Plus, Trash2, Building2 } from "lucide-react"
 import { toast } from "sonner"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
+import { useGetTaxConfigQuery } from "@/lib/utils/services/api"
+import { calculateTaxes, formatTaxBreakdown } from "@/lib/utils/tax-calculator"
 
 interface Product {
   _id: string
@@ -38,13 +40,17 @@ function PurchaseContent() {
   const [selectedProduct, setSelectedProduct] = useState("")
   const [quantity, setQuantity] = useState("")
   const [notes, setNotes] = useState("")
-  const [supplier, setSupplier] = useState("")
   const [paymentMethod, setPaymentMethod] = useState("Cash")
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [generatedInvoice, setGeneratedInvoice] = useState<any>(null)
   const [isDownloading, setIsDownloading] = useState(false)
   const invoiceRef = useRef<HTMLDivElement>(null)
+
+  // Fetch tax configuration
+  const { data: taxConfigData, isLoading: taxLoading } = useGetTaxConfigQuery(user?.id || "guest", {
+    skip: !user?.id,
+  })
 
   // Fetch products on mount
   useEffect(() => {
@@ -73,9 +79,13 @@ function PurchaseContent() {
   const currentItemTotal =
     quantity && product ? (Number.parseInt(quantity) * product.costPrice).toFixed(2) : "0.00"
 
-  const cartTotal = cartItems
-    .reduce((sum, item) => sum + item.quantity * item.product.costPrice, 0)
-    .toFixed(2)
+  // Calculate subtotal
+  const cartSubtotal = cartItems.reduce((sum, item) => sum + item.quantity * item.product.costPrice, 0)
+
+  // Calculate taxes using tax configuration
+  const taxCalculation = calculateTaxes(cartSubtotal, taxConfigData?.data) as any
+  const cartTotal = taxCalculation.grandTotal.toFixed(2)
+  const taxBreakdown = formatTaxBreakdown(taxCalculation, "₹")
 
   // Get unique suppliers from cart items
   const cartSuppliers = Array.from(
@@ -130,14 +140,24 @@ function PurchaseContent() {
     }
 
     try {
+      // Get supplier names from cart items
+      const suppliersFromCart = cartSuppliers.length > 0 ? cartSuppliers.join(", ") : "N/A"
+      
       const purchaseData = {
         items: cartItems.map((item) => ({
           product: item.product._id,
           quantity: item.quantity,
         })),
+        subtotal: parseFloat(cartSubtotal.toFixed(2)),
+        taxDetails: {
+          gst: taxCalculation.gst,
+          platformFee: taxCalculation.platformFee,
+          otherTaxes: taxCalculation.otherTaxes,
+          totalTax: taxCalculation.totalTax,
+        },
         totalAmount: parseFloat(cartTotal),
         status: "Completed",
-        supplier: supplier || "N/A",
+        supplier: suppliersFromCart,
         paymentMethod: paymentMethod,
         notes: notes,
       }
@@ -170,7 +190,6 @@ function PurchaseContent() {
         // Reset form
         setCartItems([])
         setNotes("")
-        setSupplier("")
         setPaymentMethod("Cash")
         
         // Refresh products to get updated quantities
@@ -190,17 +209,26 @@ function PurchaseContent() {
       return
     }
 
+    // Get supplier names from cart items
+    const suppliersFromCart = cartSuppliers.length > 0 ? cartSuppliers.join(", ") : "N/A"
+
     // Generate invoice data
     const invoice = {
       invoiceNumber: `INV-${Date.now()}`,
       date: new Date().toLocaleDateString(),
       time: new Date().toLocaleTimeString(),
       items: cartItems,
-      supplier: supplier || "N/A",
+      supplier: suppliersFromCart,
       paymentMethod: paymentMethod,
       notes: notes,
-      subtotal: cartTotal,
-      tax: (parseFloat(cartTotal) * 0).toFixed(2), // 0% tax for now
+      subtotal: cartSubtotal.toFixed(2),
+      taxDetails: {
+        gst: taxCalculation.gst,
+        platformFee: taxCalculation.platformFee,
+        otherTaxes: taxCalculation.otherTaxes,
+        totalTax: taxCalculation.totalTax,
+      },
+      taxBreakdown: taxBreakdown,
       total: cartTotal,
     }
 
@@ -312,8 +340,9 @@ function PurchaseContent() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Add Product Section */}
           <div className="lg:col-span-2">
-            <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-6">
-              <h2 className="text-lg font-semibold text-foreground">Add Products</h2>
+            <div className="sticky top-20 lg:top-10 z-10 space-y-6">
+              <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-6">
+                <h2 className="text-lg font-semibold text-foreground">Add Products</h2>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                 <div>
@@ -364,11 +393,11 @@ function PurchaseContent() {
                 <Plus size={18} />
                 Add to Cart
               </Button>
-            </div>
+              </div>
 
-            {/* Shopping Cart */}
-            <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4 mt-6">
-              <h2 className="text-lg font-semibold text-foreground">Shopping Cart</h2>
+              {/* Shopping Cart */}
+              <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4">
+                <h2 className="text-lg font-semibold text-foreground">Shopping Cart</h2>
 
               {cartItems.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">Your cart is empty. Add products to get started.</p>
@@ -414,6 +443,7 @@ function PurchaseContent() {
                   </Table>
                 </div>
               )}
+              </div>
             </div>
           </div>
 
@@ -448,8 +478,48 @@ function PurchaseContent() {
                 )}
               </div>
 
-              <div className="flex justify-between items-baseline">
-                <span className="text-base font-medium text-foreground">Total Amount:</span>
+              {/* Price Breakdown */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal:</span>
+                  <span className="font-medium">₹{cartSubtotal.toFixed(2)}</span>
+                </div>
+                
+                {taxCalculation.gst > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">GST:</span>
+                    <span className="font-medium">₹{taxCalculation.gst.toFixed(2)}</span>
+                  </div>
+                )}
+                
+                {taxCalculation.platformFee > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Platform Fee:</span>
+                    <span className="font-medium">₹{taxCalculation.platformFee.toFixed(2)}</span>
+                  </div>
+                )}
+                
+                {taxCalculation.otherTaxes && taxCalculation.otherTaxes.length > 0 && (
+                  <>
+                    {taxCalculation.otherTaxes.map((tax: any, index: number) => (
+                      <div key={index} className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">{tax.name}:</span>
+                        <span className="font-medium">₹{tax.amount.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </>
+                )}
+                
+                {taxCalculation.totalTax > 0 && (
+                  <div className="flex justify-between text-sm pt-2 border-t border-border">
+                    <span className="text-muted-foreground font-medium">Total Tax:</span>
+                    <span className="font-medium">₹{taxCalculation.totalTax.toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-between items-baseline pt-4 border-t border-border">
+                <span className="text-base font-medium text-foreground">Grand Total:</span>
                 <span className="text-2xl font-bold text-primary">₹{cartTotal}</span>
               </div>
 
@@ -577,10 +647,34 @@ function PurchaseContent() {
                         <td colSpan={3} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>Subtotal</td>
                         <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹{generatedInvoice.subtotal}</td>
                       </tr>
-                      <tr style={{ fontWeight: 'bold' }}>
-                        <td colSpan={3} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>Tax (0%)</td>
-                        <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹{generatedInvoice.tax}</td>
-                      </tr>
+                      {generatedInvoice.taxDetails?.gst > 0 && (
+                        <tr>
+                          <td colSpan={3} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>GST</td>
+                          <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹{generatedInvoice.taxDetails.gst.toFixed(2)}</td>
+                        </tr>
+                      )}
+                      {generatedInvoice.taxDetails?.platformFee > 0 && (
+                        <tr>
+                          <td colSpan={3} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>Platform Fee</td>
+                          <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹{generatedInvoice.taxDetails.platformFee.toFixed(2)}</td>
+                        </tr>
+                      )}
+                      {generatedInvoice.taxDetails?.otherTaxes && generatedInvoice.taxDetails.otherTaxes.length > 0 && (
+                        <>
+                          {generatedInvoice.taxDetails.otherTaxes.map((tax: any, index: number) => (
+                            <tr key={index}>
+                              <td colSpan={3} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>{tax.name}</td>
+                              <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹{tax.amount.toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </>
+                      )}
+                      {generatedInvoice.taxDetails?.totalTax > 0 && (
+                        <tr style={{ fontWeight: 'bold' }}>
+                          <td colSpan={3} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>Total Tax</td>
+                          <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹{generatedInvoice.taxDetails.totalTax.toFixed(2)}</td>
+                        </tr>
+                      )}
                       <tr style={{ fontWeight: 'bold', backgroundColor: '#f9fafb' }}>
                         <td colSpan={3} style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>Total Amount</td>
                         <td style={{ padding: '0.75rem', textAlign: 'right', border: '1px solid #eee' }}>₹{generatedInvoice.total}</td>

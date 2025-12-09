@@ -2,17 +2,19 @@
 
 import type React from "react"
 
-import { useState, useMemo, useCallback } from "react"
+import { useState, useMemo, useCallback, useEffect } from "react"
 import MainLayout from "@/components/layout/main-layout"
 import { ProtectedRoute } from "@/components/protected-route"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
-import { useGetCategoriesQuery, useAddCategoryMutation, useUpdateCategoryMutation, useDeleteCategoryMutation, useGetUnitTypesQuery, useAddUnitTypeMutation, useUpdateUnitTypeMutation, useDeleteUnitTypeMutation } from "@/lib/utils/services/api"
+import { useGetCategoriesQuery, useAddCategoryMutation, useUpdateCategoryMutation, useDeleteCategoryMutation, useGetUnitTypesQuery, useAddUnitTypeMutation, useUpdateUnitTypeMutation, useDeleteUnitTypeMutation, useGetUserSettingsQuery, useUpdateUserSettingsMutation, useGetCurrencyRatesQuery, useGetTaxConfigQuery, useUpdateTaxConfigMutation } from "@/lib/utils/services/api"
 import { toast } from "sonner"
-import { Eye, Pencil, Trash2, Plus } from "lucide-react"
+import { Eye, Pencil, Trash2, Plus, Loader2, RefreshCw } from "lucide-react"
 import { logMovement } from "@/lib/movement-logger"
+import { CURRENCIES, formatCurrency } from "@/lib/utils/currency"
+import { TIMEZONES, getUserTimezone, formatDateWithTimezone } from "@/lib/utils/timezone"
 
 interface Category {
   _id: string
@@ -48,6 +50,22 @@ function SettingsContent() {
   const [updateUnitType, { isLoading: isUpdatingUnit }] = useUpdateUnitTypeMutation()
   const [deleteUnitType, { isLoading: isDeletingUnit }] = useDeleteUnitTypeMutation()
 
+  // User Settings API hooks
+  const { data: userSettingsData, isLoading: settingsLoading } = useGetUserSettingsQuery(user?.id || "guest", {
+    skip: !user?.id,
+  })
+  const [updateUserSettings, { isLoading: isUpdatingSettings }] = useUpdateUserSettingsMutation()
+
+  // Currency rates API hook
+  const [selectedBaseCurrency, setSelectedBaseCurrency] = useState("USD")
+  const { data: currencyRatesData, isLoading: currencyLoading, refetch: refetchCurrencyRates } = useGetCurrencyRatesQuery(selectedBaseCurrency)
+
+  // Tax configuration API hooks
+  const { data: taxConfigData, isLoading: taxLoading } = useGetTaxConfigQuery(user?.id || "guest", {
+    skip: !user?.id,
+  })
+  const [updateTaxConfig, { isLoading: isUpdatingTax }] = useUpdateTaxConfigMutation()
+
   const [activeTab, setActiveTab] = useState("profile")
 
   // Modal states
@@ -82,12 +100,92 @@ function SettingsContent() {
 
   const [settings, setSettings] = useState({
     lowStockThreshold: 10,
-    currency: "INR",
+    currency: "USD",
     timezone: "UTC",
     darkMode: false,
     emailNotifications: true,
     weeklyReports: true,
   })
+
+  // Tax configuration state
+  const [taxConfig, setTaxConfig] = useState({
+    gst: {
+      enabled: false,
+      rate: 18,
+      type: "exclusive" as "inclusive" | "exclusive",
+      description: "Goods and Services Tax",
+    },
+    platformFee: {
+      enabled: false,
+      rate: 0,
+      type: "percentage" as "percentage" | "fixed",
+      description: "Platform transaction fee",
+    },
+    otherTaxes: [] as Array<{
+      _id?: string
+      name: string
+      enabled: boolean
+      rate: number
+      type: "percentage" | "fixed"
+      description: string
+    }>,
+  })
+
+  const [showAddOtherTaxModal, setShowAddOtherTaxModal] = useState(false)
+  const [editingOtherTax, setEditingOtherTax] = useState<any>(null)
+  const [otherTaxForm, setOtherTaxForm] = useState({
+    name: "",
+    rate: 0,
+    type: "percentage" as "percentage" | "fixed",
+    description: "",
+  })
+
+  // Load user settings from API when data is available
+  useEffect(() => {
+    if (userSettingsData?.data?.preferences) {
+      setSettings({
+        lowStockThreshold: userSettingsData.data.preferences.lowStockThreshold || 10,
+        currency: userSettingsData.data.preferences.currency || "USD",
+        timezone: userSettingsData.data.preferences.timezone || getUserTimezone(),
+        darkMode: userSettingsData.data.preferences.darkMode || false,
+        emailNotifications: userSettingsData.data.preferences.emailNotifications !== false,
+        weeklyReports: userSettingsData.data.preferences.weeklyReports !== false,
+      })
+      setSelectedBaseCurrency(userSettingsData.data.preferences.currency || "USD")
+    }
+  }, [userSettingsData])
+
+  // Load profile data from API
+  useEffect(() => {
+    if (userSettingsData?.data?.profile) {
+      setProfile({
+        name: userSettingsData.data.profile.name || user?.name || "",
+        email: userSettingsData.data.profile.email || user?.email || "",
+        company: userSettingsData.data.profile.company || user?.company || "",
+      })
+    }
+  }, [userSettingsData, user])
+
+  // Load tax configuration from API
+  useEffect(() => {
+    if (taxConfigData?.data) {
+      setTaxConfig({
+        gst: taxConfigData.data.gst || {
+          enabled: false,
+          rate: 18,
+          type: "exclusive",
+          description: "Goods and Services Tax",
+        },
+        platformFee: taxConfigData.data.platformFee || {
+          enabled: false,
+          rate: 0,
+          type: "percentage",
+          description: "Platform transaction fee",
+        },
+        otherTaxes: taxConfigData.data.otherTaxes || [],
+      })
+    }
+  }, [taxConfigData])
 
   // Get categories from API response
   const categories = categoriesData?.data || []
@@ -152,27 +250,37 @@ function SettingsContent() {
     if (originalProfile.email !== profile.email) changedFields.push('email')
     if (originalProfile.company !== profile.company) changedFields.push('company')
     
-    if (changedFields.length > 0) {
-      await logMovement({
-        eventType: "settings.changed",
-        eventTitle: "Profile Updated",
-        description: `Updated profile settings (${changedFields.join(', ')})`,
-        userId: user?.id || "system",
-        userName: user?.name || "System",
-        userEmail: user?.email,
-        metadata: {
-          section: "profile",
-          changedFields,
-        },
-        changes: {
-          before: originalProfile,
-          after: profile,
-        },
-      })
+    try {
+      // Save to database
+      await updateUserSettings({
+        userId: user?.id || "guest",
+        profile,
+      }).unwrap()
+
+      if (changedFields.length > 0) {
+        await logMovement({
+          eventType: "settings.changed",
+          eventTitle: "Profile Updated",
+          description: `Updated profile settings (${changedFields.join(', ')})`,
+          userId: user?.id || "system",
+          userName: user?.name || "System",
+          userEmail: user?.email,
+          metadata: {
+            section: "profile",
+            changedFields,
+          },
+          changes: {
+            before: originalProfile,
+            after: profile,
+          },
+        })
+      }
+      
+      toast.success("Profile updated successfully")
+    } catch (error) {
+      toast.error("Failed to update profile")
+      console.error("Profile update error:", error)
     }
-    
-    toast.success("Profile updated successfully")
-    console.log("[v0] Profile updated:", profile)
   }
 
   const handleChangePassword = async () => {
@@ -200,9 +308,9 @@ function SettingsContent() {
   }
 
   const handleSaveSettings = async () => {
-    const originalSettings = {
+    const originalSettings = userSettingsData?.data?.preferences || {
       lowStockThreshold: 10,
-      currency: "INR",
+      currency: "USD",
       timezone: "UTC",
       darkMode: false,
       emailNotifications: true,
@@ -217,27 +325,42 @@ function SettingsContent() {
     if (originalSettings.emailNotifications !== settings.emailNotifications) changedFields.push('email notifications')
     if (originalSettings.weeklyReports !== settings.weeklyReports) changedFields.push('weekly reports')
     
-    if (changedFields.length > 0) {
-      await logMovement({
-        eventType: "settings.changed",
-        eventTitle: "Settings Updated",
-        description: `Updated application settings (${changedFields.join(', ')})`,
-        userId: user?.id || "system",
-        userName: user?.name || "System",
-        userEmail: user?.email,
-        metadata: {
-          section: "general_settings",
-          changedFields,
-        },
-        changes: {
-          before: originalSettings,
-          after: settings,
-        },
-      })
+    try {
+      // Save to database
+      await updateUserSettings({
+        userId: user?.id || "guest",
+        preferences: settings,
+      }).unwrap()
+
+      // Update base currency if changed
+      if (originalSettings.currency !== settings.currency) {
+        setSelectedBaseCurrency(settings.currency)
+      }
+
+      if (changedFields.length > 0) {
+        await logMovement({
+          eventType: "settings.changed",
+          eventTitle: "Settings Updated",
+          description: `Updated application settings (${changedFields.join(', ')})`,
+          userId: user?.id || "system",
+          userName: user?.name || "System",
+          userEmail: user?.email,
+          metadata: {
+            section: "general_settings",
+            changedFields,
+          },
+          changes: {
+            before: originalSettings,
+            after: settings,
+          },
+        })
+      }
+      
+      toast.success("Settings saved successfully")
+    } catch (error) {
+      toast.error("Failed to save settings")
+      console.error("Settings save error:", error)
     }
-    
-    toast.success("Settings saved successfully")
-    console.log("[v0] Settings saved:", settings)
   }
 
   const handleAddCategory = async () => {
@@ -555,6 +678,154 @@ function SettingsContent() {
     setShowViewUnitModal(true)
   }
 
+  // Tax Management Handlers
+  const handleSaveTaxConfig = async () => {
+    const originalTaxConfig = taxConfigData?.data || {}
+    
+    const changedFields = []
+    if (JSON.stringify(originalTaxConfig.gst) !== JSON.stringify(taxConfig.gst)) changedFields.push('GST')
+    if (JSON.stringify(originalTaxConfig.platformFee) !== JSON.stringify(taxConfig.platformFee)) changedFields.push('Platform Fee')
+    if (JSON.stringify(originalTaxConfig.otherTaxes) !== JSON.stringify(taxConfig.otherTaxes)) changedFields.push('Other Taxes')
+    
+    try {
+      await updateTaxConfig({
+        userId: user?.id || "guest",
+        gst: taxConfig.gst,
+        platformFee: taxConfig.platformFee,
+        otherTaxes: taxConfig.otherTaxes,
+        changedBy: user?.id || "system",
+        changedByEmail: user?.email,
+        changeDescription: changedFields.length > 0 
+          ? `Updated tax configuration (${changedFields.join(', ')})` 
+          : "Tax configuration updated",
+      }).unwrap()
+
+      if (changedFields.length > 0) {
+        await logMovement({
+          eventType: "settings.changed",
+          eventTitle: "Tax Configuration Updated",
+          description: `Updated tax configuration (${changedFields.join(', ')})`,
+          userId: user?.id || "system",
+          userName: user?.name || "System",
+          userEmail: user?.email,
+          metadata: {
+            section: "tax_management",
+            changedFields,
+          },
+          changes: {
+            before: {
+              gst: originalTaxConfig.gst,
+              platformFee: originalTaxConfig.platformFee,
+              otherTaxes: originalTaxConfig.otherTaxes,
+            },
+            after: taxConfig,
+          },
+        })
+      }
+
+      toast.success("Tax configuration saved successfully")
+    } catch (error: any) {
+      toast.error(error?.data?.error || "Failed to save tax configuration")
+      console.error("Tax config save error:", error)
+    }
+  }
+
+  const handleAddOtherTax = () => {
+    if (otherTaxForm.name.trim() && otherTaxForm.rate >= 0) {
+      setTaxConfig((prev) => ({
+        ...prev,
+        otherTaxes: [
+          ...prev.otherTaxes,
+          {
+            name: otherTaxForm.name,
+            enabled: true,
+            rate: otherTaxForm.rate,
+            type: otherTaxForm.type,
+            description: otherTaxForm.description,
+          },
+        ],
+      }))
+      setOtherTaxForm({
+        name: "",
+        rate: 0,
+        type: "percentage",
+        description: "",
+      })
+      setShowAddOtherTaxModal(false)
+      toast.success("Tax added successfully. Don't forget to save changes!")
+    } else {
+      toast.error("Please provide tax name and rate")
+    }
+  }
+
+  const handleUpdateOtherTax = () => {
+    if (editingOtherTax !== null && otherTaxForm.name.trim() && otherTaxForm.rate >= 0) {
+      setTaxConfig((prev) => ({
+        ...prev,
+        otherTaxes: prev.otherTaxes.map((tax, index) =>
+          index === editingOtherTax
+            ? {
+                ...tax,
+                name: otherTaxForm.name,
+                rate: otherTaxForm.rate,
+                type: otherTaxForm.type,
+                description: otherTaxForm.description,
+              }
+            : tax
+        ),
+      }))
+      setOtherTaxForm({
+        name: "",
+        rate: 0,
+        type: "percentage",
+        description: "",
+      })
+      setEditingOtherTax(null)
+      toast.success("Tax updated successfully. Don't forget to save changes!")
+    } else {
+      toast.error("Please provide tax name and rate")
+    }
+  }
+
+  const handleRemoveOtherTax = (index: number) => {
+    setTaxConfig((prev) => ({
+      ...prev,
+      otherTaxes: prev.otherTaxes.filter((_, i) => i !== index),
+    }))
+    toast.success("Tax removed successfully. Don't forget to save changes!")
+  }
+
+  const handleToggleOtherTax = (index: number) => {
+    setTaxConfig((prev) => ({
+      ...prev,
+      otherTaxes: prev.otherTaxes.map((tax, i) =>
+        i === index ? { ...tax, enabled: !tax.enabled } : tax
+      ),
+    }))
+  }
+
+  const openAddOtherTaxModal = () => {
+    setOtherTaxForm({
+      name: "",
+      rate: 0,
+      type: "percentage",
+      description: "",
+    })
+    setEditingOtherTax(null)
+    setShowAddOtherTaxModal(true)
+  }
+
+  const openEditOtherTaxModal = (tax: any, index: number) => {
+    setOtherTaxForm({
+      name: tax.name,
+      rate: tax.rate,
+      type: tax.type,
+      description: tax.description || "",
+    })
+    setEditingOtherTax(index)
+    setShowAddOtherTaxModal(true)
+  }
+
   const handleLogout = () => {
     setShowLogoutModal(true)
   }
@@ -573,6 +844,11 @@ function SettingsContent() {
           <p className="text-sm md:text-base text-muted-foreground">Manage your account and preferences</p>
         </div>
 
+        {settingsLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Sidebar Navigation */}
           <div className="lg:col-span-1">
@@ -583,6 +859,7 @@ function SettingsContent() {
                 { id: "preferences", label: "Preferences" },
                 { id: "categories", label: "Categories" },
                 { id: "unit-types", label: "Unit Types" },
+                { id: "tax-management", label: "Tax Management" },
                 { id: "account", label: "Account" },
               ].map((tab) => (
                 <button
@@ -684,23 +961,48 @@ function SettingsContent() {
             {activeTab === "preferences" && (
               <div className="bg-card border border-border rounded-lg p-6 space-y-6">
                 <div>
-                  <h2 className="text-lg font-semibold text-foreground mb-4">App Preferences</h2>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold text-foreground">App Preferences</h2>
+                    {currencyRatesData && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>Rates updated: {new Date(currencyRatesData.lastUpdated).toLocaleString()}</span>
+                        <button
+                          onClick={() => refetchCurrencyRates()}
+                          className="p-1 hover:bg-muted rounded"
+                          title="Refresh rates"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-foreground mb-2">Currency</label>
+                        <label className="block text-sm font-medium text-foreground mb-2">
+                          Currency
+                          {currencyLoading && <Loader2 className="inline w-3 h-3 ml-2 animate-spin" />}
+                        </label>
                         <select
                           value={settings.currency}
-                          onChange={(e) => handleSettingChange("currency", e.target.value)}
+                          onChange={(e) => {
+                            handleSettingChange("currency", e.target.value)
+                            setSelectedBaseCurrency(e.target.value)
+                          }}
                           className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                         >
-                          <option>INR</option>
-                          <option>USD</option>
-                          <option>EUR</option>
-                          <option>GBP</option>
-                          <option>CAD</option>
+                          {CURRENCIES.map((currency) => (
+                            <option key={currency.code} value={currency.code}>
+                              {currency.code} - {currency.name} ({currency.symbol})
+                            </option>
+                          ))}
                         </select>
+                        {currencyRatesData?.rates && settings.currency && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            1 {selectedBaseCurrency} = {currencyRatesData.rates[settings.currency]?.toFixed(4)} {settings.currency}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-foreground mb-2">Timezone</label>
@@ -709,11 +1011,15 @@ function SettingsContent() {
                           onChange={(e) => handleSettingChange("timezone", e.target.value)}
                           className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                         >
-                          <option>UTC</option>
-                          <option>EST</option>
-                          <option>CST</option>
-                          <option>PST</option>
+                          {TIMEZONES.map((tz) => (
+                            <option key={tz.value} value={tz.value}>
+                              {tz.label} ({tz.offset})
+                            </option>
+                          ))}
                         </select>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Current time: {formatDateWithTimezone(new Date(), settings.timezone, "time")}
+                        </p>
                       </div>
                     </div>
 
@@ -771,8 +1077,15 @@ function SettingsContent() {
                     </div>
                   </div>
 
-                  <Button onClick={handleSaveSettings} className="mt-6">
-                    Save Preferences
+                  <Button onClick={handleSaveSettings} disabled={isUpdatingSettings} className="mt-6">
+                    {isUpdatingSettings ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      "Save Preferences"
+                    )}
                   </Button>
                 </div>
               </div>
@@ -1008,6 +1321,285 @@ function SettingsContent() {
               </div>
             )}
 
+            {activeTab === "tax-management" && (
+              <div className="bg-card border border-border rounded-lg p-6 space-y-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-lg font-semibold text-foreground">Tax Management</h2>
+                    <p className="text-sm text-muted-foreground">Configure taxes applied to purchases</p>
+                  </div>
+                </div>
+
+                {taxLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* GST Configuration */}
+                    <div className="border border-border rounded-lg p-4 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-base font-semibold text-foreground">GST (Goods and Services Tax)</h3>
+                          <p className="text-xs text-muted-foreground">Configure GST settings for purchases</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="text-sm text-foreground">Enable</label>
+                          <input
+                            type="checkbox"
+                            checked={taxConfig.gst.enabled}
+                            onChange={(e) =>
+                              setTaxConfig((prev) => ({
+                                ...prev,
+                                gst: { ...prev.gst, enabled: e.target.checked },
+                              }))
+                            }
+                            className="w-4 h-4 rounded border border-border"
+                          />
+                        </div>
+                      </div>
+
+                      {taxConfig.gst.enabled && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">GST Rate (%)</label>
+                            <Input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.01"
+                              value={taxConfig.gst.rate}
+                              onChange={(e) =>
+                                setTaxConfig((prev) => ({
+                                  ...prev,
+                                  gst: { ...prev.gst, rate: parseFloat(e.target.value) || 0 },
+                                }))
+                              }
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">Tax Type</label>
+                            <select
+                              value={taxConfig.gst.type}
+                              onChange={(e) =>
+                                setTaxConfig((prev) => ({
+                                  ...prev,
+                                  gst: { ...prev.gst, type: e.target.value as "inclusive" | "exclusive" },
+                                }))
+                              }
+                              className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                            >
+                              <option value="exclusive">Exclusive (Added to subtotal)</option>
+                              <option value="inclusive">Inclusive (Included in price)</option>
+                            </select>
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-foreground mb-2">Description</label>
+                            <Input
+                              type="text"
+                              value={taxConfig.gst.description}
+                              onChange={(e) =>
+                                setTaxConfig((prev) => ({
+                                  ...prev,
+                                  gst: { ...prev.gst, description: e.target.value },
+                                }))
+                              }
+                              placeholder="Enter GST description"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Platform Fee Configuration */}
+                    <div className="border border-border rounded-lg p-4 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-base font-semibold text-foreground">Platform Fee</h3>
+                          <p className="text-xs text-muted-foreground">Configure platform transaction fees</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="text-sm text-foreground">Enable</label>
+                          <input
+                            type="checkbox"
+                            checked={taxConfig.platformFee.enabled}
+                            onChange={(e) =>
+                              setTaxConfig((prev) => ({
+                                ...prev,
+                                platformFee: { ...prev.platformFee, enabled: e.target.checked },
+                              }))
+                            }
+                            className="w-4 h-4 rounded border border-border"
+                          />
+                        </div>
+                      </div>
+
+                      {taxConfig.platformFee.enabled && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">Fee Amount</label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={taxConfig.platformFee.rate}
+                              onChange={(e) =>
+                                setTaxConfig((prev) => ({
+                                  ...prev,
+                                  platformFee: { ...prev.platformFee, rate: parseFloat(e.target.value) || 0 },
+                                }))
+                              }
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">Fee Type</label>
+                            <select
+                              value={taxConfig.platformFee.type}
+                              onChange={(e) =>
+                                setTaxConfig((prev) => ({
+                                  ...prev,
+                                  platformFee: { ...prev.platformFee, type: e.target.value as "percentage" | "fixed" },
+                                }))
+                              }
+                              className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                            >
+                              <option value="percentage">Percentage (%)</option>
+                              <option value="fixed">Fixed Amount</option>
+                            </select>
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-foreground mb-2">Description</label>
+                            <Input
+                              type="text"
+                              value={taxConfig.platformFee.description}
+                              onChange={(e) =>
+                                setTaxConfig((prev) => ({
+                                  ...prev,
+                                  platformFee: { ...prev.platformFee, description: e.target.value },
+                                }))
+                              }
+                              placeholder="Enter platform fee description"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Other Taxes */}
+                    <div className="border border-border rounded-lg p-4 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-base font-semibold text-foreground">Other Taxes</h3>
+                          <p className="text-xs text-muted-foreground">Add custom tax types</p>
+                        </div>
+                        <Button onClick={openAddOtherTaxModal} size="sm" className="flex items-center gap-2">
+                          <Plus className="w-4 h-4" />
+                          Add Tax
+                        </Button>
+                      </div>
+
+                      {taxConfig.otherTaxes.length > 0 ? (
+                        <div className="space-y-2 pt-2">
+                          {taxConfig.otherTaxes.map((tax, index) => (
+                            <div
+                              key={index}
+                              className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-border"
+                            >
+                              <div className="flex items-center gap-3 flex-1">
+                                <input
+                                  type="checkbox"
+                                  checked={tax.enabled}
+                                  onChange={() => handleToggleOtherTax(index)}
+                                  className="w-4 h-4 rounded border border-border"
+                                />
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-sm font-medium text-foreground">{tax.name}</p>
+                                    <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full">
+                                      {tax.rate}
+                                      {tax.type === "percentage" ? "%" : ` ${settings.currency}`}
+                                    </span>
+                                  </div>
+                                  {tax.description && (
+                                    <p className="text-xs text-muted-foreground mt-0.5">{tax.description}</p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => openEditOtherTaxModal(tax, index)}
+                                  className="p-1.5 hover:bg-muted rounded transition-colors"
+                                  title="Edit"
+                                >
+                                  <Pencil className="w-4 h-4 text-muted-foreground" />
+                                </button>
+                                <button
+                                  onClick={() => handleRemoveOtherTax(index)}
+                                  className="p-1.5 hover:bg-muted rounded transition-colors"
+                                  title="Remove"
+                                >
+                                  <Trash2 className="w-4 h-4 text-red-500" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-6">
+                          <p className="text-sm text-muted-foreground">No custom taxes added yet</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Change History */}
+                    {taxConfigData?.data?.changeHistory && taxConfigData.data.changeHistory.length > 0 && (
+                      <div className="border border-border rounded-lg p-4 space-y-4">
+                        <h3 className="text-base font-semibold text-foreground">Change History</h3>
+                        <div className="space-y-2 max-h-80 overflow-y-auto">
+                          {[...taxConfigData.data.changeHistory].reverse().map((change: any, index: number) => (
+                            <div key={index} className="p-3 bg-muted/30 rounded-lg border border-border text-xs">
+                              <div className="flex items-start justify-between mb-2">
+                                <div>
+                                  <p className="font-medium text-foreground">{change.description}</p>
+                                  <p className="text-muted-foreground">
+                                    By: {change.changedByEmail || change.changedBy}
+                                  </p>
+                                </div>
+                                <span className="text-muted-foreground whitespace-nowrap">
+                                  {new Date(change.changeDate).toLocaleString()}
+                                </span>
+                              </div>
+                              {change.changes && (
+                                <details className="mt-2">
+                                  <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                                    View details
+                                  </summary>
+                                  <pre className="mt-2 p-2 bg-background rounded text-xs overflow-x-auto">
+                                    {JSON.stringify(change.changes, null, 2)}
+                                  </pre>
+                                </details>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <Button onClick={handleSaveTaxConfig} disabled={isUpdatingTax} className="w-full">
+                      {isUpdatingTax ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save Tax Configuration"
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
             {activeTab === "account" && (
               <div className="bg-card border border-border rounded-lg p-6 space-y-6">
                 <div>
@@ -1029,6 +1621,7 @@ function SettingsContent() {
             )}
           </div>
         </div>
+        )}
       </div>
 
       {/* Add Category Modal */}
@@ -1489,6 +2082,80 @@ function SettingsContent() {
                 className="flex-1"
               >
                 {isDeletingUnit ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Other Tax Modal */}
+      {showAddOtherTaxModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card border border-border rounded-lg p-6 max-w-md w-full">
+            <h2 className="text-lg font-semibold text-foreground mb-4">
+              {editingOtherTax !== null ? "Edit Tax" : "Add New Tax"}
+            </h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Tax Name *</label>
+                <Input
+                  value={otherTaxForm.name}
+                  onChange={(e) => setOtherTaxForm({ ...otherTaxForm, name: e.target.value })}
+                  placeholder="e.g., VAT, Sales Tax, Customs Duty"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Tax Rate *</label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={otherTaxForm.rate}
+                  onChange={(e) => setOtherTaxForm({ ...otherTaxForm, rate: parseFloat(e.target.value) || 0 })}
+                  placeholder="Enter tax rate"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Tax Type</label>
+                <select
+                  value={otherTaxForm.type}
+                  onChange={(e) =>
+                    setOtherTaxForm({ ...otherTaxForm, type: e.target.value as "percentage" | "fixed" })
+                  }
+                  className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring text-sm"
+                >
+                  <option value="percentage">Percentage (%)</option>
+                  <option value="fixed">Fixed Amount ({settings.currency})</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Description</label>
+                <textarea
+                  value={otherTaxForm.description}
+                  onChange={(e) => setOtherTaxForm({ ...otherTaxForm, description: e.target.value })}
+                  placeholder="Enter tax description"
+                  className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring text-sm resize-none"
+                  rows={3}
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowAddOtherTaxModal(false)
+                  setEditingOtherTax(null)
+                }}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={editingOtherTax !== null ? handleUpdateOtherTax : handleAddOtherTax}
+                disabled={!otherTaxForm.name.trim() || otherTaxForm.rate < 0}
+                className="flex-1"
+              >
+                {editingOtherTax !== null ? "Update Tax" : "Add Tax"}
               </Button>
             </div>
           </div>
