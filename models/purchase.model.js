@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { generatePurchaseId } from "../lib/purchase-id-generator.js";
 
 const purchaseSchema = new mongoose.Schema(
   {
@@ -76,8 +77,20 @@ const purchaseSchema = new mongoose.Schema(
 // Generate purchase ID before validation
 purchaseSchema.pre("validate", async function () {
   if (!this.purchaseId) {
-    const count = await this.constructor.countDocuments();
-    this.purchaseId = `PUR-${String(count + 1).padStart(3, "0")}`;
+    // Generate a unique 12-character purchase ID
+    let isUnique = false;
+    let newPurchaseId;
+    
+    // Keep generating until we get a unique ID
+    while (!isUnique) {
+      newPurchaseId = generatePurchaseId();
+      const existing = await this.constructor.findOne({ purchaseId: newPurchaseId });
+      if (!existing) {
+        isUnique = true;
+      }
+    }
+    
+    this.purchaseId = newPurchaseId;
   }
 });
 

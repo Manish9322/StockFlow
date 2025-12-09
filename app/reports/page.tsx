@@ -4,9 +4,8 @@ import MainLayout from "@/components/layout/main-layout"
 import { ProtectedRoute } from "@/components/protected-route"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { sampleProducts } from "@/lib/sample-data"
 import { Download } from "lucide-react"
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import {
   BarChart,
   Bar,
@@ -25,72 +24,175 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts"
+import { useGetProductsQuery, useGetMovementsQuery } from "@/lib/utils/services/api"
+
+interface Product {
+  _id: string
+  name: string
+  sku: string
+  quantity: number
+  category: {
+    _id: string
+    name: string
+  }
+  unitType: {
+    _id: string
+    name: string
+    abbreviation: string
+  }
+  costPrice: number
+  sellingPrice: number
+  supplier: string
+  minStockAlert: number
+  updatedAt: string
+  createdAt: string
+}
+
+interface Movement {
+  _id: string
+  productId: string
+  productName: string
+  eventType: string
+  quantityChange: number
+  timestamp: string
+  userId?: string
+  description?: string
+}
 
 function ReportsContent() {
   const [timePeriod, setTimePeriod] = useState("30days")
+  
+  const { data: productsData, isLoading: productsLoading } = useGetProductsQuery({})
+  const { data: movementsData, isLoading: movementsLoading } = useGetMovementsQuery({})
+  
+  const products: Product[] = productsData?.data || []
+  const movements: Movement[] = movementsData?.data || []
 
-  const lowStockProducts = sampleProducts.filter((p) => p.quantity < 10)
-  const totalInventoryValue = sampleProducts.reduce((sum, p) => sum + p.quantity * p.costPrice, 0)
-  const totalProducts = sampleProducts.length
+  const lowStockProducts = useMemo(() => {
+    return products.filter((p) => p.quantity < p.minStockAlert)
+  }, [products])
+
+  const totalInventoryValue = useMemo(() => {
+    return products.reduce((sum, p) => sum + p.quantity * p.costPrice, 0)
+  }, [products])
+
+  const totalProducts = products.length
 
   const getChartData = () => {
-    const periods = {
-      "7days": [
-        { date: "Nov 23", stock: 125 },
-        { date: "Nov 24", stock: 132 },
-        { date: "Nov 25", stock: 145 },
-        { date: "Nov 26", stock: 152 },
-        { date: "Nov 29", stock: 156 },
-      ],
-      "30days": [
-        { date: "Nov 1", stock: 145 },
-        { date: "Nov 8", stock: 152 },
-        { date: "Nov 15", stock: 138 },
-        { date: "Nov 22", stock: 142 },
-        { date: "Nov 29", stock: 156 },
-      ],
-      "90days": [
-        { date: "Sep 1", stock: 98 },
-        { date: "Sep 30", stock: 115 },
-        { date: "Oct 30", stock: 142 },
-        { date: "Nov 15", stock: 138 },
-        { date: "Nov 29", stock: 156 },
-      ],
-      custom: [
-        { date: "Nov 1", stock: 145 },
-        { date: "Nov 8", stock: 152 },
-        { date: "Nov 15", stock: 138 },
-        { date: "Nov 22", stock: 142 },
-        { date: "Nov 29", stock: 156 },
-      ],
+    const now = new Date()
+    const getDateRange = (days: number) => {
+      const endDate = new Date(now)
+      const startDate = new Date(now)
+      startDate.setDate(startDate.getDate() - days)
+      return { startDate, endDate }
     }
-    return periods[timePeriod as keyof typeof periods] || periods["30days"]
+
+    const daysMap = {
+      "7days": 7,
+      "30days": 30,
+      "90days": 90,
+      custom: 30,
+    }
+
+    const days = daysMap[timePeriod as keyof typeof daysMap] || 30
+    const { startDate, endDate } = getDateRange(days)
+
+    // Filter movements within the date range
+    const filteredMovements = movements.filter((m) => {
+      const movementDate = new Date(m.timestamp)
+      return movementDate >= startDate && movementDate <= endDate
+    })
+
+    // Group movements by date and calculate cumulative stock
+    const currentStock = products.reduce((sum, p) => sum + p.quantity, 0)
+
+    // Sort movements by date
+    const sortedMovements = [...filteredMovements].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    )
+
+    // Calculate stock at different points
+    const dataPoints: { date: string; stock: number }[] = []
+    const pointCount = days <= 7 ? days : days <= 30 ? 5 : 5
+    const interval = Math.floor(days / pointCount)
+
+    for (let i = 0; i <= pointCount; i++) {
+      const pointDate = new Date(startDate)
+      pointDate.setDate(pointDate.getDate() + i * interval)
+      
+      const dateStr = pointDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+      
+      // Calculate stock up to this point (reverse calculation from current stock)
+      const movementsAfterPoint = movements.filter((m) => new Date(m.timestamp) > pointDate)
+      const stockAtPoint = currentStock - movementsAfterPoint.reduce((sum, m) => {
+        return sum + (m.quantityChange || 0)
+      }, 0)
+      
+      dataPoints.push({ date: dateStr, stock: Math.max(0, stockAtPoint) })
+    }
+
+    return dataPoints.length > 0 ? dataPoints : [{ date: "Today", stock: currentStock }]
   }
 
   // Data for Bar Chart (Category Stock Value)
-  const categoryData = Array.from(new Set(sampleProducts.map((p) => p.category))).map((category) => {
-    const categoryProducts = sampleProducts.filter((p) => p.category === category)
-    return {
+  const categoryData = useMemo(() => {
+    const categoryMap = new Map<string, { value: number; count: number }>()
+    
+    products.forEach((p) => {
+      const categoryName = p.category?.name || "Uncategorized"
+      const existing = categoryMap.get(categoryName) || { value: 0, count: 0 }
+      categoryMap.set(categoryName, {
+        value: existing.value + p.quantity * p.costPrice,
+        count: existing.count + 1,
+      })
+    })
+
+    return Array.from(categoryMap.entries()).map(([category, data]) => ({
       category,
-      value: categoryProducts.reduce((sum, p) => sum + p.quantity * p.costPrice, 0),
-      count: categoryProducts.length,
-    }
-  })
+      value: data.value,
+      count: data.count,
+    }))
+  }, [products])
 
   // Data for Radar Chart (Product Performance)
-  const radarData = sampleProducts.slice(0, 6).map((p) => ({
-    name: p.name.split(" ")[0],
-    stock: (p.quantity / 50) * 100,
-    margin: ((p.sellingPrice - p.costPrice) / p.sellingPrice) * 100,
-    velocity: Math.random() * 100,
-  }))
+  const radarData = useMemo(() => {
+    return products.slice(0, 6).map((p) => ({
+      name: p.name.split(" ")[0],
+      stock: Math.min((p.quantity / (p.minStockAlert * 5)) * 100, 100),
+      margin: ((p.sellingPrice - p.costPrice) / p.sellingPrice) * 100,
+      velocity: Math.random() * 100, // This would need actual sales data
+    }))
+  }, [products])
 
   // Data for Composed Chart (Stock vs Revenue Potential)
-  const composedData = sampleProducts.map((p) => ({
-    name: p.name.split(" ")[0],
-    stock: p.quantity,
-    revenue: p.quantity * p.sellingPrice,
-  }))
+  const composedData = useMemo(() => {
+    return products.slice(0, 10).map((p) => ({
+      name: p.name.split(" ")[0],
+      stock: p.quantity,
+      revenue: p.quantity * p.sellingPrice,
+    }))
+  }, [products])
+
+  if (productsLoading || movementsLoading) {
+    return (
+      <MainLayout>
+        <div className="p-4 md:p-8">
+          <div className="mb-6 md:mb-8">
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Reports</h1>
+            <p className="text-sm md:text-base text-muted-foreground">
+              Analyze inventory trends, stock levels, and performance metrics
+            </p>
+          </div>
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-foreground mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading reports...</p>
+            </div>
+          </div>
+        </div>
+      </MainLayout>
+    )
+  }
 
   return (
     <MainLayout>
@@ -136,7 +238,7 @@ function ReportsContent() {
             },
             {
               label: "Avg Stock Level",
-              value: Math.round(sampleProducts.reduce((sum, p) => sum + p.quantity, 0) / totalProducts),
+              value: totalProducts > 0 ? Math.round(products.reduce((sum, p) => sum + p.quantity, 0) / totalProducts) : 0,
             },
           ].map((stat, idx) => (
             <div key={idx} className="bg-card border border-border rounded-lg p-4 md:p-6">
@@ -153,12 +255,13 @@ function ReportsContent() {
             <ResponsiveContainer width="100%" height={250}>
               <LineChart data={getChartData()}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="date" stroke="var(--color-muted-foreground)" />
-                <YAxis stroke="var(--color-muted-foreground)" />
+                <XAxis dataKey="date" stroke="var(--color-muted-foreground)" style={{ fontSize: '11px' }} />
+                <YAxis stroke="var(--color-muted-foreground)" style={{ fontSize: '11px' }} />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "var(--color-card)",
                     border: "1px solid var(--color-border)",
+                    fontSize: '12px'
                   }}
                 />
                 <Line type="monotone" dataKey="stock" stroke="var(--color-foreground)" dot={true} />
@@ -172,12 +275,13 @@ function ReportsContent() {
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={categoryData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="category" stroke="var(--color-muted-foreground)" />
-                <YAxis stroke="var(--color-muted-foreground)" />
+                <XAxis dataKey="category" stroke="var(--color-muted-foreground)" style={{ fontSize: '11px' }} />
+                <YAxis stroke="var(--color-muted-foreground)" style={{ fontSize: '11px' }} />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "var(--color-card)",
                     border: "1px solid var(--color-border)",
+                    fontSize: '12px'
                   }}
                 />
                 <Bar dataKey="value" fill="var(--color-foreground)" />
@@ -191,11 +295,11 @@ function ReportsContent() {
             <ResponsiveContainer width="100%" height={250}>
               <RadarChart data={radarData}>
                 <PolarGrid stroke="var(--color-border)" />
-                <PolarAngleAxis dataKey="name" stroke="var(--color-muted-foreground)" />
-                <PolarRadiusAxis stroke="var(--color-muted-foreground)" />
+                <PolarAngleAxis dataKey="name" stroke="var(--color-muted-foreground)" style={{ fontSize: '11px' }} />
+                <PolarRadiusAxis stroke="var(--color-muted-foreground)" style={{ fontSize: '10px' }} />
                 <Radar name="Stock Level" dataKey="stock" stroke="var(--color-foreground)" />
                 <Radar name="Margin %" dataKey="margin" stroke="var(--color-muted-foreground)" />
-                <Legend />
+                <Legend wrapperStyle={{ fontSize: '12px' }} />
               </RadarChart>
             </ResponsiveContainer>
           </div>
@@ -206,15 +310,16 @@ function ReportsContent() {
             <ResponsiveContainer width="100%" height={250}>
               <ComposedChart data={composedData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="name" stroke="var(--color-muted-foreground)" />
-                <YAxis stroke="var(--color-muted-foreground)" />
+                <XAxis dataKey="name" stroke="var(--color-muted-foreground)" style={{ fontSize: '11px' }} />
+                <YAxis stroke="var(--color-muted-foreground)" style={{ fontSize: '11px' }} />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "var(--color-card)",
                     border: "1px solid var(--color-border)",
+                    fontSize: '12px'
                   }}
                 />
-                <Legend />
+                <Legend wrapperStyle={{ fontSize: '12px' }} />
                 <Bar dataKey="stock" fill="var(--color-muted)" />
                 <Line type="monotone" dataKey="revenue" stroke="var(--color-foreground)" />
               </ComposedChart>
@@ -243,20 +348,28 @@ function ReportsContent() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {lowStockProducts.map((product) => (
-                    <TableRow key={product.id}>
-                      <TableCell className="font-medium text-xs md:text-sm">{product.name}</TableCell>
-                      <TableCell className="text-xs md:text-sm text-right">
-                        <span className="px-2 py-1 bg-destructive/10 text-destructive text-xs rounded font-medium">
-                          {product.quantity} units
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-xs md:text-sm hidden sm:table-cell">{product.category}</TableCell>
-                      <TableCell className="text-xs md:text-sm hidden md:table-cell">
-                        ₹{(product.quantity * product.costPrice).toLocaleString()}
+                  {lowStockProducts.length > 0 ? (
+                    lowStockProducts.map((product) => (
+                      <TableRow key={product._id}>
+                        <TableCell className="font-medium text-xs md:text-sm">{product.name}</TableCell>
+                        <TableCell className="text-xs md:text-sm text-right">
+                          <span className="px-2 py-1 bg-destructive/10 text-destructive text-xs rounded font-medium">
+                            {product.quantity} {product.unitType?.abbreviation || 'units'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-xs md:text-sm hidden sm:table-cell">{product.category?.name || 'Uncategorized'}</TableCell>
+                        <TableCell className="text-xs md:text-sm hidden md:table-cell">
+                          ₹{(product.quantity * product.costPrice).toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                        No low stock products found
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             </div>
@@ -265,22 +378,28 @@ function ReportsContent() {
           <div className="bg-card border border-border rounded-lg p-6">
             <h2 className="text-lg font-semibold text-foreground mb-6">Top Categories by Stock Value</h2>
             <div className="space-y-4">
-              {categoryData.map((cat) => {
-                const percentage = (cat.value / totalInventoryValue) * 100
-                return (
-                  <div key={cat.category}>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium text-foreground">{cat.category}</span>
-                      <span className="text-sm text-muted-foreground">
-                        ₹{cat.value.toLocaleString()} ({percentage.toFixed(1)}%)
-                      </span>
+              {categoryData.length > 0 ? (
+                categoryData.map((cat) => {
+                  const percentage = totalInventoryValue > 0 ? (cat.value / totalInventoryValue) * 100 : 0
+                  return (
+                    <div key={cat.category}>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-medium text-foreground">{cat.category}</span>
+                        <span className="text-sm text-muted-foreground">
+                          ₹{cat.value.toLocaleString()} ({percentage.toFixed(1)}%)
+                        </span>
+                      </div>
+                      <div className="w-full h-2 bg-muted rounded overflow-hidden">
+                        <div className="h-full bg-foreground transition-all" style={{ width: `${percentage}%` }}></div>
+                      </div>
                     </div>
-                    <div className="w-full h-2 bg-muted rounded overflow-hidden">
-                      <div className="h-full bg-foreground transition-all" style={{ width: `${percentage}%` }}></div>
-                    </div>
-                  </div>
-                )
-              })}
+                  )
+                })
+              ) : (
+                <div className="text-center text-muted-foreground py-8">
+                  No category data available
+                </div>
+              )}
             </div>
           </div>
         </div>
