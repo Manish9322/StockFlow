@@ -16,6 +16,8 @@ export default function Sidebar({ isOpen, onNavigate }: SidebarProps) {
   const { t } = useLanguage()
   const { user } = useAuth()
 
+  // Determine if we're on an admin route
+  const isAdminRoute = pathname.startsWith("/admin")
   const isAdmin = user?.role === "admin"
 
   // Admin navigation items
@@ -41,7 +43,10 @@ export default function Sidebar({ isOpen, onNavigate }: SidebarProps) {
     { href: "/settings", label: t("nav.settings"), icon: Settings },
   ]
 
-  const navItems = isAdmin ? adminNavItems : userNavItems
+  // Show admin nav only when on admin routes AND user is admin
+  // Show user nav for all other routes (including when admin is on user routes)
+  const navItems = isAdminRoute && isAdmin ? adminNavItems : userNavItems
+  const sidebarTitle = isAdminRoute && isAdmin ? "Admin Panel" : "Inventory"
 
   return (
     <aside
@@ -49,9 +54,9 @@ export default function Sidebar({ isOpen, onNavigate }: SidebarProps) {
         isOpen ? "w-64" : "w-0"
       } bg-background border-r border-border transition-all duration-300 ease-in-out overflow-hidden flex flex-col h-screen`}
     >
-      <div className="h-16 border-b border-border flex items-center px-6 flex-shrink-0">
+      <div className="h-16 border-b border-border flex items-center px-6 shrink-0">
         <h1 className="text-lg font-semibold text-foreground whitespace-nowrap">
-          {isAdmin ? "Admin Panel" : "Inventory"}
+          {sidebarTitle}
         </h1>
       </div>
 
@@ -70,15 +75,15 @@ export default function Sidebar({ isOpen, onNavigate }: SidebarProps) {
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"
               }`}
             >
-              <Icon size={18} className="flex-shrink-0" />
+              <Icon size={18} className="shrink-0" />
               <span>{item.label}</span>
             </Link>
           )
         })}
       </nav>
 
-      <div className="p-4 border-t border-border text-xs text-muted-foreground flex-shrink-0 whitespace-nowrap">
-        <p>© 2025 {isAdmin ? "Admin Panel" : "Inventory"}</p>
+      <div className="p-4 border-t border-border text-xs text-muted-foreground shrink-0 whitespace-nowrap">
+        <p>© 2025 {sidebarTitle}</p>
       </div>
     </aside>
   )
