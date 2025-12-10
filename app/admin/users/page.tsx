@@ -58,7 +58,7 @@ interface User {
 }
 
 function AdminUsersContent() {
-  const { user } = useAuth()
+  const { adminUser } = useAuth()
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [roleFilter, setRoleFilter] = useState("all")
@@ -300,7 +300,7 @@ function AdminUsersContent() {
                     <TableRow key={userItem._id}>
                       <TableCell className="font-medium">
                         {userItem.name}
-                        {userItem._id === user?.id && (
+                        {userItem._id === adminUser?.id && (
                           <Badge variant="outline" className="ml-2">You</Badge>
                         )}
                       </TableCell>
@@ -333,7 +333,7 @@ function AdminUsersContent() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteUser(userItem)}
-                            disabled={userItem._id === user?.id}
+                            disabled={userItem._id === adminUser?.id}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>

@@ -4,10 +4,19 @@
  */
 
 /**
- * Get the stored authentication token
+ * Get the stored authentication token based on the current route
  */
 export function getAuthToken(): string | null {
   if (typeof window === "undefined") return null
+  
+  // Check if we're on an admin route
+  const isAdminRoute = window.location.pathname.startsWith("/admin")
+  
+  // Return the appropriate token
+  if (isAdminRoute) {
+    return localStorage.getItem("adminToken")
+  }
+  
   return localStorage.getItem("token")
 }
 
@@ -31,12 +40,20 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
     headers,
   })
 
-  // If unauthorized, redirect to login
+  // If unauthorized, redirect to appropriate login page
   if (response.status === 401) {
     if (typeof window !== "undefined") {
-      localStorage.removeItem("user")
-      localStorage.removeItem("token")
-      window.location.href = "/login"
+      const isAdminRoute = window.location.pathname.startsWith("/admin")
+      
+      if (isAdminRoute) {
+        localStorage.removeItem("adminUser")
+        localStorage.removeItem("adminToken")
+        window.location.href = "/admin/login"
+      } else {
+        localStorage.removeItem("user")
+        localStorage.removeItem("token")
+        window.location.href = "/login"
+      }
     }
   }
 

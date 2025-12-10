@@ -26,40 +26,6 @@ export async function POST(request) {
       );
     }
 
-    // Static admin credentials check (development/demo purposes)
-    const ADMIN_EMAIL = "stockflowadmin@gmail.com";
-    const ADMIN_PASSWORD = "StockFlowAdmin@2025";
-
-    if (email.toLowerCase().trim() === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-      // Generate token for static admin
-      const adminId = "admin-static-id";
-      const token = generateToken(adminId, ADMIN_EMAIL);
-
-      // Create static admin user object
-      const adminUser = {
-        _id: adminId,
-        id: adminId,
-        email: ADMIN_EMAIL,
-        name: "Stock Flow Admin",
-        company: "Stock Flow",
-        role: "admin",
-        status: "active",
-      };
-
-      return createAuthResponse(
-        {
-          success: true,
-          message: "Admin login successful",
-          data: {
-            user: adminUser,
-            token,
-          },
-        },
-        token,
-        200
-      );
-    }
-
     await _db();
 
     // Find user by email (include password field)

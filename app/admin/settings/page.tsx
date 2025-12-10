@@ -24,7 +24,7 @@ import {
 import Link from "next/link"
 
 function AdminSettingsContent() {
-  const { user } = useAuth()
+  const { adminUser } = useAuth()
   const { data: statsData, refetch } = useGetStatisticsQuery(undefined)
   const { data: categoriesData } = useGetCategoriesQuery({})
   const { data: unitTypesData } = useGetUnitTypesQuery({})
@@ -99,14 +99,14 @@ function AdminSettingsContent() {
               <User className="w-5 h-5 text-muted-foreground" />
               <div>
                 <p className="text-xs text-muted-foreground">Name</p>
-                <p className="font-medium text-foreground">{user?.name}</p>
+                <p className="font-medium text-foreground">{adminUser?.name}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
               <Mail className="w-5 h-5 text-muted-foreground" />
               <div>
                 <p className="text-xs text-muted-foreground">Email</p>
-                <p className="font-medium text-foreground">{user?.email}</p>
+                <p className="font-medium text-foreground">{adminUser?.email}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">

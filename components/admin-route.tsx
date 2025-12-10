@@ -5,14 +5,14 @@ import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 
 export function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth()
+  const { adminUser, loading } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (!loading && (!user || user.role !== "admin")) {
-      router.push("/")
+    if (!loading && (!adminUser || adminUser.role !== "admin")) {
+      router.push("/admin/login")
     }
-  }, [user, loading, router])
+  }, [adminUser, loading, router])
 
   if (loading) {
     return (
@@ -22,7 +22,7 @@ export function AdminRoute({ children }: { children: React.ReactNode }) {
     )
   }
 
-  if (!user || user.role !== "admin") {
+  if (!adminUser || adminUser.role !== "admin") {
     return null
   }
 

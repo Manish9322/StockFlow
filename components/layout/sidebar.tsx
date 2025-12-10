@@ -14,11 +14,11 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onNavigate }: SidebarProps) {
   const pathname = usePathname()
   const { t } = useLanguage()
-  const { user } = useAuth()
+  const { user, adminUser } = useAuth()
 
   // Determine if we're on an admin route
   const isAdminRoute = pathname.startsWith("/admin")
-  const isAdmin = user?.role === "admin"
+  const isAdmin = adminUser?.role === "admin"
 
   // Admin navigation items
   const adminNavItems = [

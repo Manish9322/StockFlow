@@ -2,7 +2,7 @@
 
 import { Menu, Bell, User, LogOut, Search } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { useState, useEffect, useRef, useCallback } from "react"
 import { sampleProducts } from "@/lib/sample-data"
 
@@ -11,8 +11,9 @@ interface TopBarProps {
 }
 
 export default function TopBar({ onMenuClick }: TopBarProps) {
-  const { user, logout } = useAuth()
+  const { user, adminUser, logout, adminLogout } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
   const [showDropdown, setShowDropdown] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState<any[]>([])
@@ -20,6 +21,10 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
   const searchRef = useRef<HTMLDivElement>(null)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Determine if we're on an admin route
+  const isAdminRoute = pathname.startsWith("/admin")
+  const currentUser = isAdminRoute ? adminUser : user
 
   // Input updates immediately, debounce only applies to search execution
   const handleSearchInput = useCallback((value: string) => {
@@ -70,8 +75,13 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
   }
 
   const confirmLogout = () => {
-    logout()
-    router.push("/login")
+    if (isAdminRoute) {
+      adminLogout()
+      router.push("/admin/login")
+    } else {
+      logout()
+      router.push("/login")
+    }
     setShowDropdown(false)
     setShowLogoutModal(false)
   }
@@ -158,11 +168,11 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
               <User size={20} className="text-foreground" />
             </button>
 
-            {showDropdown && user && (
+            {showDropdown && currentUser && (
               <div className="absolute right-0 mt-2 w-48 bg-card border border-border rounded-lg shadow-lg z-50">
                 <div className="p-3 border-b border-border">
-                  <p className="text-sm font-medium text-foreground">{user.name}</p>
-                  <p className="text-xs text-muted-foreground">{user.email}</p>
+                  <p className="text-sm font-medium text-foreground">{currentUser.name}</p>
+                  <p className="text-xs text-muted-foreground">{currentUser.email}</p>
                 </div>
                 <button
                   onClick={handleLogout}
