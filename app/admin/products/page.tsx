@@ -3,10 +3,8 @@
 import { useState, useMemo } from "react"
 import MainLayout from "@/components/layout/main-layout"
 import { AdminRoute } from "@/components/admin-route"
-import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { 
   Table, 
@@ -25,10 +23,8 @@ import {
 } from "@/components/ui/select"
 import { useGetProductsQuery } from "@/lib/utils/services/api"
 import { 
-  Package, 
   Search,
   RefreshCw,
-  AlertCircle,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react"
@@ -124,66 +120,58 @@ function AdminProductsContent() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="p-4 md:p-8 space-y-6 md:space-y-8">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">All Products</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              View and manage products across all users
-            </p>
-          </div>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">All Products</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
+            View and manage products across all users
+          </p>
         </div>
 
-        {/* Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="p-4 border border-border">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Products</p>
-                <p className="text-2xl font-bold text-foreground mt-1">{stats.total}</p>
+        {/* Statistics Cards */}
+        {isLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-card border border-border rounded-lg p-4 md:p-6 animate-pulse">
+                <div className="h-4 bg-muted rounded w-24 mb-2"></div>
+                <div className="h-8 bg-muted rounded w-16"></div>
               </div>
-              <Package className="w-8 h-8 text-muted-foreground" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-card border border-border rounded-lg p-4 md:p-6">
+              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Total Products</p>
+              <p className="text-2xl md:text-2xl font-semibold text-foreground">{stats.total}</p>
             </div>
-          </Card>
-          <Card className="p-4 border border-border">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">In Stock</p>
-                <p className="text-2xl font-bold text-foreground mt-1">{stats.inStock}</p>
-              </div>
-              <div className="w-3 h-3 rounded-full bg-foreground"></div>
+            <div className="bg-card border border-border rounded-lg p-4 md:p-6">
+              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">In Stock</p>
+              <p className="text-2xl md:text-2xl font-semibold text-foreground">{stats.inStock}</p>
             </div>
-          </Card>
-          <Card className="p-4 border border-border">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Low Stock</p>
-                <p className="text-2xl font-bold text-foreground mt-1">{stats.lowStock}</p>
-              </div>
-              <AlertCircle className="w-8 h-8 text-muted-foreground" />
+            <div className="bg-card border border-border rounded-lg p-4 md:p-6">
+              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Low Stock</p>
+              <p className="text-2xl md:text-2xl font-semibold text-foreground">{stats.lowStock}</p>
             </div>
-          </Card>
-          <Card className="p-4 border border-border">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Out of Stock</p>
-                <p className="text-2xl font-bold text-foreground mt-1">{stats.outOfStock}</p>
-              </div>
-              <div className="w-3 h-3 rounded-full bg-muted-foreground"></div>
+            <div className="bg-card border border-border rounded-lg p-4 md:p-6">
+              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Out of Stock</p>
+              <p className="text-2xl md:text-2xl font-semibold text-foreground">{stats.outOfStock}</p>
             </div>
-          </Card>
-        </div>
+          </div>
+        )}
 
         {/* Filters */}
-        <Card className="p-4 border border-border">
+        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4 md:space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-foreground">Filter Products</h2>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="md:col-span-2">
-              <Label>Search Products</Label>
+              <label className="block text-sm font-medium text-foreground mb-2">Search Products</label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
@@ -195,7 +183,7 @@ function AdminProductsContent() {
               </div>
             </div>
             <div>
-              <Label>Category</Label>
+              <label className="block text-sm font-medium text-foreground mb-2">Category</label>
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                 <SelectTrigger>
                   <SelectValue />
@@ -209,7 +197,7 @@ function AdminProductsContent() {
               </Select>
             </div>
             <div>
-              <Label>Stock Status</Label>
+              <label className="block text-sm font-medium text-foreground mb-2">Stock Status</label>
               <Select value={stockStatus} onValueChange={setStockStatus}>
                 <SelectTrigger>
                   <SelectValue />
@@ -223,18 +211,11 @@ function AdminProductsContent() {
               </Select>
             </div>
           </div>
-        </Card>
+        </div>
 
         {/* Products Table */}
-        <Card className="border border-border">
-          <div className="p-4 border-b border-border">
-            <div className="flex items-center gap-2">
-              <Package className="w-5 h-5 text-muted-foreground" />
-              <h3 className="font-semibold text-foreground">
-                Products ({filteredProducts.length})
-              </h3>
-            </div>
-          </div>
+        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-foreground">Products List ({filteredProducts.length})</h2>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -284,10 +265,9 @@ function AdminProductsContent() {
               </TableBody>
             </Table>
           </div>
-          
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="p-4 border-t border-border flex items-center justify-between">
+            <div className="flex items-center justify-between pt-4 border-t border-border">
               <p className="text-sm text-muted-foreground">
                 Page {currentPage} of {totalPages}
               </p>
@@ -311,7 +291,7 @@ function AdminProductsContent() {
               </div>
             </div>
           )}
-        </Card>
+        </div>
       </div>
     </MainLayout>
   )

@@ -3,12 +3,10 @@
 import { useState } from "react"
 import MainLayout from "@/components/layout/main-layout"
 import { AdminRoute } from "@/components/admin-route"
-import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
 import { 
   Table, 
   TableBody, 
@@ -33,7 +31,6 @@ import {
 } from "@/lib/utils/services/api"
 import { toast } from "sonner"
 import { 
-  FolderTree, 
   Plus, 
   Edit, 
   Trash2, 
@@ -136,65 +133,63 @@ function AdminCategoriesContent() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="p-4 md:p-8 space-y-6 md:space-y-8">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Categories</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Manage product categories
-            </p>
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Categories</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Manage product categories
+          </p>
+        </div>
+
+        {/* Statistics Card */}
+        {isLoading ? (
+          <div className="bg-card border border-border rounded-lg p-4 md:p-6 animate-pulse">
+            <div className="h-4 bg-muted rounded w-32 mb-2"></div>
+            <div className="h-8 bg-muted rounded w-16"></div>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => refetch()}>
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh
-            </Button>
-            <Button size="sm" onClick={() => {
-              setFormData({ name: "", description: "" })
-              setShowAddModal(true)
-            }}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Category
-            </Button>
+        ) : (
+          <div className="bg-card border border-border rounded-lg p-4 md:p-6">
+            <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Total Categories</p>
+            <p className="text-2xl md:text-2xl font-semibold text-foreground">{categories.length}</p>
+          </div>
+        )}
+
+        {/* Search and Add */}
+        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4 md:space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-foreground">Manage Categories</h2>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Refresh
+              </Button>
+              <Button size="sm" onClick={() => {
+                setFormData({ name: "", description: "" })
+                setShowAddModal(true)
+              }}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Category
+              </Button>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">Search Categories</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or description..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
           </div>
         </div>
 
-        {/* Statistics */}
-        <Card className="p-4 border border-border">
-          <div className="flex items-center gap-4">
-            <FolderTree className="w-8 h-8 text-muted-foreground" />
-            <div>
-              <p className="text-2xl font-bold text-foreground">{categories.length}</p>
-              <p className="text-sm text-muted-foreground">Total Categories</p>
-            </div>
-          </div>
-        </Card>
-
-        {/* Search */}
-        <Card className="p-4 border border-border">
-          <Label>Search Categories</Label>
-          <div className="relative mt-2">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name or description..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-        </Card>
-
         {/* Categories Table */}
-        <Card className="border border-border">
-          <div className="p-4 border-b border-border">
-            <div className="flex items-center gap-2">
-              <FolderTree className="w-5 h-5 text-muted-foreground" />
-              <h3 className="font-semibold text-foreground">
-                Categories ({filteredCategories.length})
-              </h3>
-            </div>
-          </div>
+        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-foreground">Categories List ({filteredCategories.length})</h2>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -263,7 +258,7 @@ function AdminCategoriesContent() {
               </TableBody>
             </Table>
           </div>
-        </Card>
+        </div>
       </div>
 
       {/* Add Modal */}

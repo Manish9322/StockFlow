@@ -3,10 +3,8 @@
 import { useState } from "react"
 import MainLayout from "@/components/layout/main-layout"
 import { AdminRoute } from "@/components/admin-route"
-import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { 
   Table, 
@@ -25,17 +23,16 @@ import {
 } from "@/components/ui/select"
 import { useGetMovementsQuery } from "@/lib/utils/services/api"
 import { 
-  Activity, 
   RefreshCw,
   Search,
   ChevronLeft,
   ChevronRight,
   TrendingUp,
   TrendingDown,
-  Package,
   Edit,
+  Activity,
 } from "lucide-react"
-import { format, formatDistanceToNow } from "date-fns"
+import { format } from "date-fns"
 
 interface Movement {
   _id: string
@@ -114,54 +111,66 @@ function AdminActivitiesContent() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="p-4 md:p-8 space-y-6 md:space-y-8">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">System Activities</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Track all product movements and changes
-            </p>
-          </div>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">System Activities</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Track all product movements and changes across the system
+          </p>
         </div>
 
-        {/* Statistics */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <Card className="p-4 border border-border">
-            <p className="text-sm text-muted-foreground">Total</p>
-            <p className="text-2xl font-bold text-foreground mt-1">{stats.total}</p>
-          </Card>
-          <Card className="p-4 border border-border">
-            <p className="text-sm text-muted-foreground">Added</p>
-            <p className="text-2xl font-bold text-foreground mt-1">{stats.added}</p>
-          </Card>
-          <Card className="p-4 border border-border">
-            <p className="text-sm text-muted-foreground">Updated</p>
-            <p className="text-2xl font-bold text-foreground mt-1">{stats.updated}</p>
-          </Card>
-          <Card className="p-4 border border-border">
-            <p className="text-sm text-muted-foreground">Removed</p>
-            <p className="text-2xl font-bold text-foreground mt-1">{stats.removed}</p>
-          </Card>
-          <Card className="p-4 border border-border">
-            <p className="text-sm text-muted-foreground">Purchases</p>
-            <p className="text-2xl font-bold text-foreground mt-1">{stats.purchases}</p>
-          </Card>
-          <Card className="p-4 border border-border">
-            <p className="text-sm text-muted-foreground">Refills</p>
-            <p className="text-2xl font-bold text-foreground mt-1">{stats.refills}</p>
-          </Card>
-        </div>
+        {/* Statistics Cards */}
+        {isLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="bg-card border border-border rounded-lg p-4 animate-pulse">
+                <div className="h-4 bg-muted rounded w-16 mb-2"></div>
+                <div className="h-8 bg-muted rounded w-12"></div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="bg-card border border-border rounded-lg p-4">
+              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Total</p>
+              <p className="text-2xl font-semibold text-foreground">{stats.total}</p>
+            </div>
+            <div className="bg-card border border-border rounded-lg p-4">
+              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Added</p>
+              <p className="text-2xl font-semibold text-foreground">{stats.added}</p>
+            </div>
+            <div className="bg-card border border-border rounded-lg p-4">
+              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Updated</p>
+              <p className="text-2xl font-semibold text-foreground">{stats.updated}</p>
+            </div>
+            <div className="bg-card border border-border rounded-lg p-4">
+              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Removed</p>
+              <p className="text-2xl font-semibold text-foreground">{stats.removed}</p>
+            </div>
+            <div className="bg-card border border-border rounded-lg p-4">
+              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Purchases</p>
+              <p className="text-2xl font-semibold text-foreground">{stats.purchases}</p>
+            </div>
+            <div className="bg-card border border-border rounded-lg p-4">
+              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Refills</p>
+              <p className="text-2xl font-semibold text-foreground">{stats.refills}</p>
+            </div>
+          </div>
+        )}
 
         {/* Filters */}
-        <Card className="p-4 border border-border">
+        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4 md:space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-foreground">Filter Activities</h2>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="md:col-span-2">
-              <Label>Search Activities</Label>
+              <label className="block text-sm font-medium text-foreground mb-2">Search Activities</label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
@@ -173,7 +182,7 @@ function AdminActivitiesContent() {
               </div>
             </div>
             <div>
-              <Label>Event Type</Label>
+              <label className="block text-sm font-medium text-foreground mb-2">Event Type</label>
               <Select value={eventTypeFilter} onValueChange={setEventTypeFilter}>
                 <SelectTrigger>
                   <SelectValue />
@@ -189,18 +198,11 @@ function AdminActivitiesContent() {
               </Select>
             </div>
           </div>
-        </Card>
+        </div>
 
         {/* Activities Table */}
-        <Card className="border border-border">
-          <div className="p-4 border-b border-border">
-            <div className="flex items-center gap-2">
-              <Activity className="w-5 h-5 text-muted-foreground" />
-              <h3 className="font-semibold text-foreground">
-                Activities ({filteredMovements.length})
-              </h3>
-            </div>
-          </div>
+        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-foreground">Activities List ({filteredMovements.length})</h2>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -273,7 +275,7 @@ function AdminActivitiesContent() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="p-4 border-t border-border flex items-center justify-between">
+            <div className="flex items-center justify-between pt-4 border-t border-border">
               <p className="text-sm text-muted-foreground">
                 Page {currentPage} of {totalPages}
               </p>
@@ -297,7 +299,7 @@ function AdminActivitiesContent() {
               </div>
             </div>
           )}
-        </Card>
+        </div>
       </div>
     </MainLayout>
   )

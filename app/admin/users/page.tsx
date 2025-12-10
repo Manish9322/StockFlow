@@ -3,7 +3,6 @@
 import { useState } from "react"
 import MainLayout from "@/components/layout/main-layout"
 import { AdminRoute } from "@/components/admin-route"
-import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -39,7 +38,6 @@ import {
 } from "@/lib/utils/services/api"
 import { toast } from "sonner"
 import { 
-  Users, 
   Shield, 
   Trash2, 
   Edit, 
@@ -90,6 +88,12 @@ function AdminUsersContent() {
   })
 
   const users = usersData?.users || []
+
+  // Calculate statistics
+  const totalUsers = users.length
+  const activeUsers = users.filter((u: User) => u.status === "active").length
+  const adminUsers = users.filter((u: User) => u.role === "admin").length
+  const regularUsers = users.filter((u: User) => u.role === "user").length
 
   const handleEditUser = (userToEdit: User) => {
     setSelectedUser(userToEdit)
@@ -162,30 +166,62 @@ function AdminUsersContent() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="p-4 md:p-8 space-y-6 md:space-y-8">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">User Management</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Manage user accounts and permissions
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetchUsers()}
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">User Management</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Manage user accounts and permissions
+          </p>
         </div>
 
+        {/* Statistics Cards */}
+        {usersLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-card border border-border rounded-lg p-4 md:p-6 animate-pulse">
+                <div className="h-4 bg-muted rounded w-24 mb-2"></div>
+                <div className="h-8 bg-muted rounded w-16"></div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-card border border-border rounded-lg p-4 md:p-6">
+              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Total Users</p>
+              <p className="text-2xl md:text-2xl font-semibold text-foreground">{totalUsers}</p>
+            </div>
+            <div className="bg-card border border-border rounded-lg p-4 md:p-6">
+              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Active Users</p>
+              <p className="text-2xl md:text-2xl font-semibold text-foreground">{activeUsers}</p>
+            </div>
+            <div className="bg-card border border-border rounded-lg p-4 md:p-6">
+              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Admin Users</p>
+              <p className="text-2xl md:text-2xl font-semibold text-foreground">{adminUsers}</p>
+            </div>
+            <div className="bg-card border border-border rounded-lg p-4 md:p-6">
+              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Regular Users</p>
+              <p className="text-2xl md:text-2xl font-semibold text-foreground">{regularUsers}</p>
+            </div>
+          </div>
+        )}
+
         {/* Filters */}
-        <Card className="p-4 border border-border">
+        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4 md:space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-foreground">Filter Users</h2>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetchUsers()}
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="md:col-span-2">
-              <Label>Search Users</Label>
+              <label className="block text-sm font-medium text-foreground mb-2">Search Users</label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
@@ -197,7 +233,7 @@ function AdminUsersContent() {
               </div>
             </div>
             <div>
-              <Label>Status</Label>
+              <label className="block text-sm font-medium text-foreground mb-2">Status</label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger>
                   <SelectValue />
@@ -211,7 +247,7 @@ function AdminUsersContent() {
               </Select>
             </div>
             <div>
-              <Label>Role</Label>
+              <label className="block text-sm font-medium text-foreground mb-2">Role</label>
               <Select value={roleFilter} onValueChange={setRoleFilter}>
                 <SelectTrigger>
                   <SelectValue />
@@ -224,18 +260,11 @@ function AdminUsersContent() {
               </Select>
             </div>
           </div>
-        </Card>
+        </div>
 
         {/* Users Table */}
-        <Card className="border border-border">
-          <div className="p-4 border-b border-border">
-            <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-muted-foreground" />
-              <h3 className="font-semibold text-foreground">
-                Users ({users.length})
-              </h3>
-            </div>
-          </div>
+        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-foreground">Users List ({users.length})</h2>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -316,7 +345,7 @@ function AdminUsersContent() {
               </TableBody>
             </Table>
           </div>
-        </Card>
+        </div>
       </div>
 
       {/* Edit Modal */}
