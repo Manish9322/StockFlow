@@ -2,7 +2,6 @@
 
 import MainLayout from "@/components/layout/main-layout"
 import { AdminRoute } from "@/components/admin-route"
-import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/lib/auth-context"
@@ -12,13 +11,11 @@ import {
   useGetUnitTypesQuery,
 } from "@/lib/utils/services/api"
 import { 
-  Settings,
   FolderTree,
   Ruler,
   Shield,
   User,
   Mail,
-  Building2,
   RefreshCw,
   Users,
   Package,
@@ -79,26 +76,23 @@ function AdminSettingsContent() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="p-4 md:p-8 space-y-6 md:space-y-8">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Admin Settings</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              System configuration and management
-            </p>
-          </div>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Admin Settings</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
+            System configuration and management
+          </p>
         </div>
 
         {/* Admin Profile */}
-        <Card className="p-6 border border-border">
-          <div className="flex items-center gap-2 mb-4">
-            <Shield className="w-5 h-5 text-muted-foreground" />
-            <h3 className="font-semibold text-foreground">Admin Profile</h3>
+        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4 md:space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-foreground">Admin Profile</h2>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
@@ -123,20 +117,17 @@ function AdminSettingsContent() {
               </div>
             </div>
           </div>
-        </Card>
+        </div>
 
         {/* System Configuration */}
-        <Card className="p-6 border border-border">
-          <div className="flex items-center gap-2 mb-4">
-            <Settings className="w-5 h-5 text-muted-foreground" />
-            <h3 className="font-semibold text-foreground">System Configuration</h3>
-          </div>
+        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4 md:space-y-6">
+          <h2 className="text-lg font-semibold text-foreground">System Configuration</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {quickLinks.map((link) => {
               const Icon = link.icon
               return (
                 <Link key={link.href} href={link.href}>
-                  <Card className="p-4 border border-border hover:bg-muted transition-colors cursor-pointer h-full">
+                  <div className="p-4 border border-border rounded-lg hover:bg-muted transition-colors cursor-pointer h-full">
                     <div className="flex items-start justify-between mb-3">
                       <Icon className="w-6 h-6 text-muted-foreground" />
                       <Badge variant="outline">{link.stat}</Badge>
@@ -146,38 +137,35 @@ function AdminSettingsContent() {
                     <p className="text-xs text-muted-foreground mt-2">
                       {link.stat} {link.statLabel}
                     </p>
-                  </Card>
+                  </div>
                 </Link>
               )
             })}
           </div>
-        </Card>
+        </div>
 
         {/* System Statistics */}
-        <Card className="p-6 border border-border">
-          <div className="flex items-center gap-2 mb-4">
-            <Activity className="w-5 h-5 text-muted-foreground" />
-            <h3 className="font-semibold text-foreground">System Overview</h3>
-          </div>
+        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4 md:space-y-6">
+          <h2 className="text-lg font-semibold text-foreground">System Overview</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 border border-border rounded-lg">
-              <p className="text-2xl font-bold text-foreground">{statistics?.users?.total || 0}</p>
-              <p className="text-sm text-muted-foreground mt-1">Total Users</p>
+            <div className="bg-card border border-border rounded-lg p-4 md:p-6">
+              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Total Users</p>
+              <p className="text-2xl md:text-2xl font-semibold text-foreground">{statistics?.users?.total || 0}</p>
             </div>
-            <div className="text-center p-4 border border-border rounded-lg">
-              <p className="text-2xl font-bold text-foreground">{statistics?.users?.admins || 0}</p>
-              <p className="text-sm text-muted-foreground mt-1">Admins</p>
+            <div className="bg-card border border-border rounded-lg p-4 md:p-6">
+              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Admins</p>
+              <p className="text-2xl md:text-2xl font-semibold text-foreground">{statistics?.users?.admins || 0}</p>
             </div>
-            <div className="text-center p-4 border border-border rounded-lg">
-              <p className="text-2xl font-bold text-foreground">{statistics?.products?.total || 0}</p>
-              <p className="text-sm text-muted-foreground mt-1">Products</p>
+            <div className="bg-card border border-border rounded-lg p-4 md:p-6">
+              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Products</p>
+              <p className="text-2xl md:text-2xl font-semibold text-foreground">{statistics?.products?.total || 0}</p>
             </div>
-            <div className="text-center p-4 border border-border rounded-lg">
-              <p className="text-2xl font-bold text-foreground">{statistics?.activity?.recentActivity || 0}</p>
-              <p className="text-sm text-muted-foreground mt-1">Recent Activity</p>
+            <div className="bg-card border border-border rounded-lg p-4 md:p-6">
+              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Recent Activity</p>
+              <p className="text-2xl md:text-2xl font-semibold text-foreground">{statistics?.activity?.recentActivity || 0}</p>
             </div>
           </div>
-        </Card>
+        </div>
       </div>
     </MainLayout>
   )
