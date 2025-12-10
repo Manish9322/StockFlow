@@ -2,8 +2,9 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Plus, RefreshCw, BarChart3, Settings, ShoppingCart, History } from "lucide-react"
+import { LayoutDashboard, Plus, RefreshCw, BarChart3, Settings, ShoppingCart, History, Shield, Users, Package, FolderTree, Ruler, Activity } from "lucide-react"
 import { useLanguage } from "@/lib/language-context"
+import { useAuth } from "@/lib/auth-context"
 
 interface SidebarProps {
   isOpen: boolean
@@ -13,8 +14,23 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onNavigate }: SidebarProps) {
   const pathname = usePathname()
   const { t } = useLanguage()
+  const { user } = useAuth()
 
-  const navItems = [
+  const isAdmin = user?.role === "admin"
+
+  // Admin navigation items
+  const adminNavItems = [
+    { href: "/admin/dashboard", label: "Admin Dashboard", icon: Shield },
+    { href: "/admin/users", label: "User Management", icon: Users },
+    { href: "/admin/products", label: "All Products", icon: Package },
+    { href: "/admin/categories", label: "Categories", icon: FolderTree },
+    { href: "/admin/unit-types", label: "Unit Types", icon: Ruler },
+    { href: "/admin/activities", label: "System Activities", icon: Activity },
+    { href: "/admin/settings", label: "Admin Settings", icon: Settings },
+  ]
+
+  // Regular user navigation items
+  const userNavItems = [
     { href: "/", label: t("nav.dashboard"), icon: LayoutDashboard },
     { href: "/add-product", label: t("nav.add_product"), icon: Plus },
     { href: "/stock-refill", label: t("nav.stock_refill"), icon: RefreshCw },
@@ -25,6 +41,8 @@ export default function Sidebar({ isOpen, onNavigate }: SidebarProps) {
     { href: "/settings", label: t("nav.settings"), icon: Settings },
   ]
 
+  const navItems = isAdmin ? adminNavItems : userNavItems
+
   return (
     <aside
       className={`${
@@ -32,7 +50,9 @@ export default function Sidebar({ isOpen, onNavigate }: SidebarProps) {
       } bg-background border-r border-border transition-all duration-300 ease-in-out overflow-hidden flex flex-col h-screen`}
     >
       <div className="h-16 border-b border-border flex items-center px-6 flex-shrink-0">
-        <h1 className="text-lg font-semibold text-foreground whitespace-nowrap">Inventory</h1>
+        <h1 className="text-lg font-semibold text-foreground whitespace-nowrap">
+          {isAdmin ? "Admin Panel" : "Inventory"}
+        </h1>
       </div>
 
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
@@ -58,7 +78,7 @@ export default function Sidebar({ isOpen, onNavigate }: SidebarProps) {
       </nav>
 
       <div className="p-4 border-t border-border text-xs text-muted-foreground flex-shrink-0 whitespace-nowrap">
-        <p>© 2025 Inventory</p>
+        <p>© 2025 {isAdmin ? "Admin Panel" : "Inventory"}</p>
       </div>
     </aside>
   )

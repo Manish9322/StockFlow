@@ -3,13 +3,18 @@ import _db from "@/lib/utils/db";
 import Purchase from "@/models/purchase.model";
 import Product from "@/models/product.model";
 import Movement from "@/models/movement.model";
+import { requireAuth } from "@/lib/auth-helpers";
 
 // GET - Fetch all purchases
 export async function GET(request) {
   try {
     await _db();
     
-    const purchases = await Purchase.find({})
+    // Verify user is authenticated
+    const { error, userId } = requireAuth(request);
+    if (error) return error;
+    
+    const purchases = await Purchase.find({ userId })
       .populate({
         path: "items.product",
         select: "name sku",
@@ -38,6 +43,10 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     await _db();
+    
+    // Verify user is authenticated
+    const { error, userId } = requireAuth(request);
+    if (error) return error;
     
     const body = await request.json();
     const {
@@ -85,8 +94,8 @@ export async function POST(request) {
         );
       }
       
-      // Fetch product details
-      const product = await Product.findById(item.product);
+      // Fetch product details - verify it belongs to user
+      const product = await Product.findOne({ _id: item.product, userId });
       if (!product) {
         return NextResponse.json(
           {
@@ -115,6 +124,7 @@ export async function POST(request) {
     
     // Create purchase
     const purchase = new Purchase({
+      userId,
       items: preparedItems,
       subtotal: subtotal || totalAmount,
       taxDetails: taxDetails || {
@@ -148,8 +158,8 @@ export async function POST(request) {
         eventType: "purchase.created",
         eventTitle: "Purchase Created",
         description: `Created purchase ${populatedPurchase.purchaseId}: ${itemsSummary}`,
-        userId: body.userId || "system",
-        userName: body.userName || "System",
+        userId: userId,
+        userName: body.userName || "User",
         userEmail: body.userEmail,
         relatedPurchase: populatedPurchase._id,
         metadata: {
@@ -178,8 +188,8 @@ export async function POST(request) {
           eventType: "stock.refill",
           eventTitle: "Stock Refill",
           description: `Stock refilled for ${item.productName}: +${item.quantity} units (via purchase ${populatedPurchase.purchaseId})`,
-          userId: body.userId || "system",
-          userName: body.userName || "System",
+          userId: userId,
+          userName: body.userName || "User",
           userEmail: body.userEmail,
           relatedProduct: item.product,
           relatedPurchase: populatedPurchase._id,

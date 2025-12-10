@@ -1,28 +1,28 @@
 import { NextResponse } from "next/server";
 import _db from "@/lib/utils/db";
 import Movement from "@/models/movement.model";
+import { requireAuth } from "@/lib/auth-helpers";
 
 // GET - Fetch all movements with optional filters
 export async function GET(request) {
   try {
     await _db();
     
+    // Verify user is authenticated
+    const { error, userId } = requireAuth(request);
+    if (error) return error;
+    
     const { searchParams } = new URL(request.url);
     const eventType = searchParams.get("eventType");
-    const userId = searchParams.get("userId");
     const dateFrom = searchParams.get("dateFrom");
     const dateTo = searchParams.get("dateTo");
     const limit = searchParams.get("limit");
     
-    // Build query
-    let query = {};
+    // Build query - always filter by authenticated userId
+    let query = { userId };
     
     if (eventType && eventType !== "all") {
       query.eventType = eventType;
-    }
-    
-    if (userId) {
-      query.userId = userId;
     }
     
     if (dateFrom || dateTo) {

@@ -1,14 +1,19 @@
 import { NextResponse } from "next/server";
 import _db from "@/lib/utils/db";
 import UnitType from "@/models/unitType.model";
+import { requireAuth } from "@/lib/auth-helpers";
 
 // GET - Fetch single unit type by ID
 export async function GET(request, { params }) {
   try {
     await _db();
     
+    // Verify user is authenticated
+    const { error, userId } = requireAuth(request);
+    if (error) return error;
+    
     const { id } = await params;
-    const unitType = await UnitType.findById(id);
+    const unitType = await UnitType.findOne({ _id: id, userId });
     
     if (!unitType) {
       return NextResponse.json(
@@ -42,6 +47,10 @@ export async function PUT(request, { params }) {
   try {
     await _db();
     
+    // Verify user is authenticated
+    const { error, userId } = requireAuth(request);
+    if (error) return error;
+    
     const { id } = await params;
     const body = await request.json();
     const { name, abbreviation, description, status } = body;
@@ -67,8 +76,8 @@ export async function PUT(request, { params }) {
       );
     }
     
-    // Check if unit type exists
-    const existingUnitType = await UnitType.findById(id);
+    // Check if unit type exists and belongs to user
+    const existingUnitType = await UnitType.findOne({ _id: id, userId });
     if (!existingUnitType) {
       return NextResponse.json(
         {
@@ -79,8 +88,9 @@ export async function PUT(request, { params }) {
       );
     }
     
-    // Check if another unit type with the same name or abbreviation exists (excluding current one)
+    // Check if another unit type with the same name or abbreviation exists for this user (excluding current one)
     const duplicateUnitType = await UnitType.findOne({
+      userId,
       _id: { $ne: id },
       $or: [
         { name: { $regex: new RegExp(`^${name}$`, 'i') } },
@@ -145,10 +155,14 @@ export async function DELETE(request, { params }) {
   try {
     await _db();
     
+    // Verify user is authenticated
+    const { error, userId } = requireAuth(request);
+    if (error) return error;
+    
     const { id } = await params;
     
-    // Check if unit type exists
-    const unitType = await UnitType.findById(id);
+    // Check if unit type exists and belongs to user
+    const unitType = await UnitType.findOne({ _id: id, userId });
     if (!unitType) {
       return NextResponse.json(
         {

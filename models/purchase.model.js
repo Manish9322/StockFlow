@@ -3,6 +3,12 @@ import { generatePurchaseId } from "../lib/purchase-id-generator.js";
 
 const purchaseSchema = new mongoose.Schema(
   {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: [true, "User ID is required"],
+      index: true,
+    },
     purchaseId: {
       type: String,
       unique: true,

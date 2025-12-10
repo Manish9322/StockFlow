@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
 import _db from "@/lib/utils/db";
 import UnitType from "@/models/unitType.model";
+import { requireAuth } from "@/lib/auth-helpers";
 
 // GET - Fetch all unit types
 export async function GET(request) {
   try {
     await _db();
     
-    const unitTypes = await UnitType.find({}).sort({ createdAt: -1 });
+    // Verify user is authenticated
+    const { error, userId } = requireAuth(request);
+    if (error) return error;
+    
+    const unitTypes = await UnitType.find({ userId }).sort({ createdAt: -1 });
     
     return NextResponse.json({
       success: true,
@@ -31,6 +36,10 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     await _db();
+    
+    // Verify user is authenticated
+    const { error, userId } = requireAuth(request);
+    if (error) return error;
     
     const body = await request.json();
     const { name, abbreviation, description, status } = body;
@@ -56,8 +65,9 @@ export async function POST(request) {
       );
     }
     
-    // Check if unit type already exists
+    // Check if unit type already exists for this user
     const existingUnitType = await UnitType.findOne({ 
+      userId,
       $or: [
         { name: { $regex: new RegExp(`^${name}$`, 'i') } },
         { abbreviation: { $regex: new RegExp(`^${abbreviation}$`, 'i') } }
@@ -76,6 +86,7 @@ export async function POST(request) {
     
     // Create new unit type
     const unitType = await UnitType.create({
+      userId,
       name: name.trim(),
       abbreviation: abbreviation.trim().toUpperCase(),
       description: description?.trim() || "",

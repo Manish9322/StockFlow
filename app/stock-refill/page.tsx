@@ -48,7 +48,13 @@ export default function StockRefill() {
   const fetchProducts = async () => {
     try {
       setLoading(true)
-      const response = await fetch("/api/product")
+      const token = localStorage.getItem('token')
+      const response = await fetch("/api/product", {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
       const data = await response.json()
       
       if (data.success) {
@@ -56,7 +62,7 @@ export default function StockRefill() {
       } else {
         toast({
           title: "Error",
-          description: "Failed to fetch products",
+          description: data.error || "Failed to fetch products",
           variant: "destructive",
         })
       }
@@ -127,6 +133,7 @@ export default function StockRefill() {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem('token')}`,
         },
         body: JSON.stringify({
           quantity: updatedQuantity,

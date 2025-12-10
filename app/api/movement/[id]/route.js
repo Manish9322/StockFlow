@@ -1,15 +1,20 @@
 import { NextResponse } from "next/server";
 import _db from "@/lib/utils/db";
 import Movement from "@/models/movement.model";
+import { requireAuth } from "@/lib/auth-helpers";
 
 // GET - Fetch a single movement by ID
 export async function GET(request, { params }) {
   try {
     await _db();
     
+    // Verify user is authenticated
+    const { error, userId } = requireAuth(request);
+    if (error) return error;
+    
     const { id } = params;
     
-    const movement = await Movement.findById(id)
+    const movement = await Movement.findOne({ _id: id, userId })
       .populate("relatedProduct", "name sku quantity")
       .populate("relatedPurchase", "purchaseId totalAmount")
       .populate("relatedCategory", "name");
@@ -46,10 +51,14 @@ export async function PUT(request, { params }) {
   try {
     await _db();
     
+    // Verify user is authenticated
+    const { error, userId } = requireAuth(request);
+    if (error) return error;
+    
     const { id } = params;
     const body = await request.json();
     
-    const movement = await Movement.findById(id);
+    const movement = await Movement.findOne({ _id: id, userId });
     
     if (!movement) {
       return NextResponse.json(

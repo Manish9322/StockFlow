@@ -74,7 +74,13 @@ function MovementHistoryContent() {
   const fetchMovements = async () => {
     try {
       setLoading(true)
-      const response = await fetch("/api/movement")
+      const token = localStorage.getItem('token')
+      const response = await fetch("/api/movement", {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
       const data = await response.json()
       
       if (data.success) {

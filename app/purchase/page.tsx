@@ -59,7 +59,13 @@ function PurchaseContent() {
 
   const fetchProducts = async () => {
     try {
-      const response = await fetch("/api/product")
+      const token = localStorage.getItem('token')
+      const response = await fetch("/api/product", {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
       const data = await response.json()
       
       if (data.success) {
@@ -166,6 +172,7 @@ function PurchaseContent() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem('token')}`,
         },
         body: JSON.stringify(purchaseData),
       })

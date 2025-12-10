@@ -1,21 +1,16 @@
 import { NextResponse } from "next/server";
-import connectDB from "@/lib/utils/db";
+import _db from "../../../lib/utils/db";
 import UserSettings from "@/models/userSettings.model";
+import { requireAuth } from "@/lib/auth-helpers";
 
 // GET - Retrieve user settings
 export async function GET(request) {
   try {
-    await connectDB();
+    await _db();
     
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
-
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, error: "User ID is required" },
-        { status: 400 }
-      );
-    }
+    // Verify user is authenticated
+    const { error, userId } = requireAuth(request);
+    if (error) return error;
 
     let settings = await UserSettings.findOne({ userId });
 
@@ -50,17 +45,14 @@ export async function GET(request) {
 // POST/PUT - Update user settings
 export async function POST(request) {
   try {
-    await connectDB();
+    await _db();
+    
+    // Verify user is authenticated
+    const { error, userId } = requireAuth(request);
+    if (error) return error;
     
     const body = await request.json();
-    const { userId, profile, preferences } = body;
-
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, error: "User ID is required" },
-        { status: 400 }
-      );
-    }
+    const { profile, preferences } = body;
 
     // Find existing settings or create new
     let settings = await UserSettings.findOne({ userId });

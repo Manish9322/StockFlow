@@ -2,6 +2,12 @@ import mongoose from "mongoose";
 
 const productSchema = new mongoose.Schema(
   {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: [true, "User ID is required"],
+      index: true,
+    },
     name: {
       type: String,
       required: [true, "Product name is required"],
@@ -89,9 +95,10 @@ const productSchema = new mongoose.Schema(
 );
 
 // Index for better query performance
-productSchema.index({ sku: 1 });
-productSchema.index({ category: 1 });
-productSchema.index({ status: 1 });
+productSchema.index({ userId: 1, createdAt: -1 });
+productSchema.index({ userId: 1, category: 1 });
+productSchema.index({ userId: 1, sku: 1 }, { unique: true });
+productSchema.index({ userId: 1, status: 1 });
 
 const Product = mongoose.models.Product || mongoose.model("Product", productSchema);
 

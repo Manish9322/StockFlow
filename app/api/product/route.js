@@ -4,13 +4,18 @@ import Product from "@/models/product.model";
 import Category from "@/models/category.model";
 import UnitType from "@/models/unitType.model";
 import Movement from "@/models/movement.model";
+import { requireAuth } from "@/lib/auth-helpers";
 
 // GET - Fetch all products
 export async function GET(request) {
   try {
     await _db();
     
-    const products = await Product.find({})
+    // Verify user is authenticated
+    const { error, userId } = requireAuth(request);
+    if (error) return error;
+    
+    const products = await Product.find({ userId })
       .populate("category", "name")
       .populate("unitType", "name abbreviation")
       .sort({ createdAt: -1 });
@@ -37,6 +42,10 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     await _db();
+    
+    // Verify user is authenticated
+    const { error, userId } = requireAuth(request);
+    if (error) return error;
     
     const body = await request.json();
     const {
@@ -100,8 +109,9 @@ export async function POST(request) {
       );
     }
     
-    // Check if product with same SKU already exists
+    // Check if product with same SKU already exists for this user
     const existingProduct = await Product.findOne({ 
+      userId,
       sku: { $regex: new RegExp(`^${sku}$`, 'i') }
     });
     
@@ -117,6 +127,7 @@ export async function POST(request) {
     
     // Create new product
     const product = await Product.create({
+      userId,
       name: name.trim(),
       sku: sku.trim().toUpperCase(),
       description: description?.trim() || "",
@@ -147,8 +158,8 @@ export async function POST(request) {
         eventType: "product.created",
         eventTitle: "Product Created",
         description: `Created new product: ${populatedProduct.name} (SKU: ${populatedProduct.sku})`,
-        userId: body.userId || "system",
-        userName: body.userName || "System",
+        userId: userId,
+        userName: body.userName || "User",
         userEmail: body.userEmail,
         relatedProduct: populatedProduct._id,
         metadata: {

@@ -2,14 +2,19 @@ import { NextResponse } from "next/server";
 import _db from "@/lib/utils/db";
 import Product from "@/models/product.model";
 import Movement from "@/models/movement.model";
+import { requireAuth } from "@/lib/auth-helpers";
 
 // GET - Fetch single product by ID
 export async function GET(request, { params }) {
   try {
     await _db();
     
+    // Verify user is authenticated
+    const { error, userId } = requireAuth(request);
+    if (error) return error;
+    
     const { id } = await params;
-    const product = await Product.findById(id)
+    const product = await Product.findOne({ _id: id, userId })
       .populate("category", "name description")
       .populate("unitType", "name abbreviation");
     
@@ -45,11 +50,15 @@ export async function PUT(request, { params }) {
   try {
     await _db();
     
+    // Verify user is authenticated
+    const { error, userId } = requireAuth(request);
+    if (error) return error;
+    
     const { id } = await params;
     const body = await request.json();
     
-    // Check if product exists
-    const existingProduct = await Product.findById(id);
+    // Check if product exists and belongs to user
+    const existingProduct = await Product.findOne({ _id: id, userId });
     if (!existingProduct) {
       return NextResponse.json(
         {
@@ -60,9 +69,10 @@ export async function PUT(request, { params }) {
       );
     }
     
-    // If SKU is being updated, check for duplicates
+    // If SKU is being updated, check for duplicates within user's products
     if (body.sku && body.sku !== existingProduct.sku) {
       const duplicateProduct = await Product.findOne({
+        userId,
         _id: { $ne: id },
         sku: { $regex: new RegExp(`^${body.sku}$`, 'i') }
       });
@@ -114,8 +124,8 @@ export async function PUT(request, { params }) {
         eventType: "product.updated",
         eventTitle: "Product Updated",
         description: `Updated product: ${updatedProduct.name}${changeDescription}`,
-        userId: body.userId || "system",
-        userName: body.userName || "System",
+        userId: userId,
+        userName: body.userName || "User",
         userEmail: body.userEmail,
         relatedProduct: updatedProduct._id,
         metadata: {
@@ -172,13 +182,13 @@ export async function DELETE(request, { params }) {
   try {
     await _db();
     
-    const { id } = await params;
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId") || "system";
-    const userName = searchParams.get("userName") || "System";
-    const userEmail = searchParams.get("userEmail");
+    // Verify user is authenticated
+    const { error, userId } = requireAuth(request);
+    if (error) return error;
     
-    const product = await Product.findById(id)
+    const { id } = await params;
+    
+    const product = await Product.findOne({ _id: id, userId })
       .populate("category", "name")
       .populate("unitType", "name abbreviation");
       
@@ -209,8 +219,8 @@ export async function DELETE(request, { params }) {
         eventTitle: "Product Deleted",
         description: `Deleted product: ${productInfo.name} (SKU: ${productInfo.sku})`,
         userId,
-        userName,
-        userEmail,
+        userName: "User",
+        userEmail: null,
         metadata: {
           productName: productInfo.name,
           sku: productInfo.sku,

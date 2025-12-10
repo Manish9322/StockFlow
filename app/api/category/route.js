@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
 import _db from "@/lib/utils/db";
 import Category from "@/models/category.model";
+import { requireAuth } from "@/lib/auth-helpers";
 
 // GET - Fetch all categories
 export async function GET(request) {
   try {
     await _db();
     
-    const categories = await Category.find({}).sort({ createdAt: -1 });
+    // Verify user is authenticated
+    const { error, userId } = requireAuth(request);
+    if (error) return error;
+    
+    const categories = await Category.find({ userId }).sort({ createdAt: -1 });
     
     return NextResponse.json({
       success: true,
@@ -32,6 +37,10 @@ export async function POST(request) {
   try {
     await _db();
     
+    // Verify user is authenticated
+    const { error, userId } = requireAuth(request);
+    if (error) return error;
+    
     const body = await request.json();
     const { name, description, status } = body;
     
@@ -46,8 +55,9 @@ export async function POST(request) {
       );
     }
     
-    // Check if category already exists
+    // Check if category already exists for this user
     const existingCategory = await Category.findOne({ 
+      userId,
       name: { $regex: new RegExp(`^${name}$`, 'i') } 
     });
     
@@ -63,6 +73,7 @@ export async function POST(request) {
     
     // Create new category
     const category = await Category.create({
+      userId,
       name: name.trim(),
       description: description?.trim() || "",
       status: status || "active",

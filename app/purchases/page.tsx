@@ -77,7 +77,13 @@ function PurchasesContent() {
   const fetchPurchases = async () => {
     try {
       setLoading(true)
-      const response = await fetch("/api/purchase")
+      const token = localStorage.getItem('token')
+      const response = await fetch("/api/purchase", {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
       const data = await response.json()
       
       if (data.success) {
