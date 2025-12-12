@@ -21,8 +21,12 @@ const taxConfigSchema = new mongoose.Schema(
   {
     userId: {
       type: String,
-      required: true,
+      required: false, // Optional for global admin-created tax configs
       index: true,
+    },
+    isGlobal: {
+      type: Boolean,
+      default: false, // True for admin-created global tax configurations
     },
     gst: {
       enabled: {
@@ -95,8 +99,17 @@ const taxConfigSchema = new mongoose.Schema(
   }
 );
 
-// Ensure only one tax config per user
-taxConfigSchema.index({ userId: 1 }, { unique: true });
+// Ensure only one global tax config
+taxConfigSchema.index(
+  { isGlobal: 1 },
+  { unique: true, partialFilterExpression: { isGlobal: true } }
+);
+
+// Ensure only one tax config per user for non-global configs
+taxConfigSchema.index(
+  { userId: 1 },
+  { unique: true, partialFilterExpression: { isGlobal: { $ne: true } } }
+);
 
 const TaxConfig = mongoose.models.TaxConfig || mongoose.model("TaxConfig", taxConfigSchema);
 

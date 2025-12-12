@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/utils/db";
 import TaxConfig from "@/models/tax.model";
+import { requireAuth } from "@/lib/auth-helpers";
 
 // GET: Get tax configuration for a user
 export async function GET(request) {
@@ -10,19 +11,14 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
 
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, error: "User ID is required" },
-        { status: 400 }
-      );
-    }
+    // For regular users, fetch global tax config (admin-created)
+    // For admin, also fetch global config
+    let taxConfig = await TaxConfig.findOne({ isGlobal: true });
 
-    let taxConfig = await TaxConfig.findOne({ userId });
-
-    // If no config exists, create a default one
+    // If no global config exists, create a default one
     if (!taxConfig) {
       taxConfig = await TaxConfig.create({
-        userId,
+        isGlobal: true,
         gst: {
           enabled: false,
           rate: 18,
@@ -54,27 +50,37 @@ export async function GET(request) {
   }
 }
 
-// POST: Create or update tax configuration
+// POST: Create or update tax configuration (Admin only)
 export async function POST(request) {
   try {
     await dbConnect();
 
-    const body = await request.json();
-    const { userId, gst, platformFee, otherTaxes, changedBy, changedByEmail, changeDescription } = body;
-
-    if (!userId) {
+    // Verify user is authenticated and is admin
+    const { error, userId: authUserId } = requireAuth(request);
+    if (error) return error;
+    
+    // Get user role from request headers
+    const role = request.headers.get("X-User-Role");
+    if (role !== "admin") {
       return NextResponse.json(
-        { success: false, error: "User ID is required" },
-        { status: 400 }
+        {
+          success: false,
+          error: "Unauthorized. Only admins can modify tax configurations.",
+        },
+        { status: 403 }
       );
     }
 
-    let taxConfig = await TaxConfig.findOne({ userId });
+    const body = await request.json();
+    const { userId, gst, platformFee, otherTaxes, changedBy, changedByEmail, changeDescription } = body;
+
+    // Admin updates the global tax configuration
+    let taxConfig = await TaxConfig.findOne({ isGlobal: true });
 
     if (!taxConfig) {
-      // Create new tax configuration
+      // Create new global tax configuration
       taxConfig = await TaxConfig.create({
-        userId,
+        isGlobal: true,
         gst: gst || {
           enabled: false,
           rate: 18,
@@ -88,7 +94,7 @@ export async function POST(request) {
         otherTaxes: otherTaxes || [],
         changeHistory: [
           {
-            changedBy: changedBy || userId,
+            changedBy: changedBy || "admin",
             changedByEmail,
             changeDate: new Date(),
             changes: { action: "created", data: { gst, platformFee, otherTaxes } },
@@ -98,7 +104,7 @@ export async function POST(request) {
         status: "active",
       });
     } else {
-      // Update existing configuration and track changes
+      // Update existing global configuration and track changes
       const oldConfig = {
         gst: taxConfig.gst,
         platformFee: taxConfig.platformFee,
@@ -112,7 +118,7 @@ export async function POST(request) {
 
       // Add to change history
       taxConfig.changeHistory.push({
-        changedBy: changedBy || userId,
+        changedBy: changedBy || "admin",
         changedByEmail,
         changeDate: new Date(),
         changes: {
@@ -139,23 +145,33 @@ export async function POST(request) {
   }
 }
 
-// DELETE: Delete a tax configuration (soft delete by setting status to inactive)
+// DELETE: Delete a tax configuration (Admin only, soft delete by setting status to inactive)
 export async function DELETE(request) {
   try {
     await dbConnect();
 
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
-
-    if (!userId) {
+    // Verify user is authenticated and is admin
+    const { error, userId: authUserId } = requireAuth(request);
+    if (error) return error;
+    
+    // Get user role from request headers
+    const role = request.headers.get("X-User-Role");
+    if (role !== "admin") {
       return NextResponse.json(
-        { success: false, error: "User ID is required" },
-        { status: 400 }
+        {
+          success: false,
+          error: "Unauthorized. Only admins can delete tax configurations.",
+        },
+        { status: 403 }
       );
     }
 
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get("userId");
+
+    // Delete/deactivate the global tax configuration
     const taxConfig = await TaxConfig.findOneAndUpdate(
-      { userId },
+      { isGlobal: true },
       { status: "inactive" },
       { new: true }
     );

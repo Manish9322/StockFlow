@@ -104,15 +104,37 @@ function PurchaseContent() {
       return
     }
 
+    const quantityNum = Number.parseInt(quantity)
+    
+    // Validate quantity is positive
+    if (quantityNum <= 0) {
+      toast.error("Quantity must be greater than 0")
+      return
+    }
+
+    // Check if requested quantity exceeds available stock
+    if (quantityNum > product!.quantity) {
+      toast.error(`Insufficient stock! Available: ${product!.quantity}, Requested: ${quantityNum}`)
+      return
+    }
+
     // Check if the product already exists in the cart (by product ID)
     const existingItemIndex = cartItems.findIndex(
       (item) => item.product._id === selectedProduct
     )
 
     if (existingItemIndex !== -1) {
+      // Product already exists, check total quantity doesn't exceed stock
+      const newTotalQuantity = cartItems[existingItemIndex].quantity + quantityNum
+      
+      if (newTotalQuantity > product!.quantity) {
+        toast.error(`Total quantity in cart would exceed available stock! Available: ${product!.quantity}, Total in cart would be: ${newTotalQuantity}`)
+        return
+      }
+      
       // Product already exists, update the quantity
       const updatedCartItems = [...cartItems]
-      updatedCartItems[existingItemIndex].quantity += Number.parseInt(quantity)
+      updatedCartItems[existingItemIndex].quantity = newTotalQuantity
       setCartItems(updatedCartItems)
       toast.success(`Updated ${product!.name} quantity in cart`)
     } else {
@@ -120,7 +142,7 @@ function PurchaseContent() {
       const newItem: CartItem = {
         id: `${selectedProduct}-${Date.now()}`,
         product: product!,
-        quantity: Number.parseInt(quantity),
+        quantity: quantityNum,
       }
       setCartItems([...cartItems, newItem])
       toast.success(`Added ${product!.name} to cart`)

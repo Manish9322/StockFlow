@@ -12,7 +12,9 @@ export async function GET(request) {
     const { error, userId } = requireAuth(request);
     if (error) return error;
     
-    const categories = await Category.find({ userId }).sort({ createdAt: -1 });
+    // Fetch global categories (admin-created) or user-specific categories
+    // For now, we only fetch global categories since all categories are admin-managed
+    const categories = await Category.find({ isGlobal: true }).sort({ createdAt: -1 });
     
     return NextResponse.json({
       success: true,
@@ -32,14 +34,26 @@ export async function GET(request) {
   }
 }
 
-// POST - Create a new category
+// POST - Create a new category (Admin only)
 export async function POST(request) {
   try {
     await _db();
     
-    // Verify user is authenticated
+    // Verify user is authenticated and is admin
     const { error, userId } = requireAuth(request);
     if (error) return error;
+    
+    // Get user role from request headers
+    const role = request.headers.get("X-User-Role");
+    if (role !== "admin") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Unauthorized. Only admins can create categories.",
+        },
+        { status: 403 }
+      );
+    }
     
     const body = await request.json();
     const { name, description, status } = body;
@@ -55,9 +69,9 @@ export async function POST(request) {
       );
     }
     
-    // Check if category already exists for this user
+    // Check if category already exists (global check)
     const existingCategory = await Category.findOne({ 
-      userId,
+      isGlobal: true,
       name: { $regex: new RegExp(`^${name}$`, 'i') } 
     });
     
@@ -71,12 +85,12 @@ export async function POST(request) {
       );
     }
     
-    // Create new category
+    // Create new global category (no userId needed)
     const category = await Category.create({
-      userId,
       name: name.trim(),
       description: description?.trim() || "",
       status: status || "active",
+      isGlobal: true, // Mark as global admin-created category
     });
     
     return NextResponse.json(

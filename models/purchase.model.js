@@ -64,12 +64,12 @@ const purchaseSchema = new mongoose.Schema(
         default: 0,
       },
       otherTaxes: [
-        {
-          name: String,
-          rate: Number,
-          type: String,
-          amount: Number,
-        },
+        new mongoose.Schema({
+          name: { type: String },
+          rate: { type: Number },
+          type: { type: String },
+          amount: { type: Number },
+        }, { _id: false })
       ],
       totalTax: {
         type: Number,

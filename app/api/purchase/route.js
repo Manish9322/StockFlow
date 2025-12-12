@@ -106,6 +106,17 @@ export async function POST(request) {
         );
       }
       
+      // Check if requested quantity exceeds available stock
+      if (item.quantity > product.quantity) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Insufficient stock for ${product.name}. Available: ${product.quantity}, Requested: ${item.quantity}`,
+          },
+          { status: 400 }
+        );
+      }
+      
       const subtotal = item.quantity * product.costPrice;
       
       preparedItems.push({
@@ -117,7 +128,7 @@ export async function POST(request) {
         subtotal: subtotal,
       });
       
-      // Update product quantity (subtract from stock)
+      // Update product quantity (reduce stock - selling decreases inventory)
       product.quantity -= item.quantity;
       await product.save();
     }

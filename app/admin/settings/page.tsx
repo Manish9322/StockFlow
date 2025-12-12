@@ -57,6 +57,14 @@ function AdminSettingsContent() {
       statLabel: "unit types",
     },
     {
+      title: "Tax Management",
+      description: "Configure global tax settings",
+      icon: Shield,
+      href: "/admin/tax-management",
+      stat: "GST",
+      statLabel: "configuration",
+    },
+    {
       title: "All Products",
       description: "View products across all users",
       icon: Package,
@@ -121,9 +129,13 @@ function AdminSettingsContent() {
 
         {/* System Configuration */}
         <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4 md:space-y-6">
-          <h2 className="text-lg font-semibold text-foreground">System Configuration</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {quickLinks.map((link) => {
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-foreground">System Configuration</h2>
+            <p className="text-xs text-muted-foreground">
+              Manage global settings for all users
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{quickLinks.map((link) => {
               const Icon = link.icon
               return (
                 <Link key={link.href} href={link.href}>

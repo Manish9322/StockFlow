@@ -5,7 +5,7 @@ const unitTypeSchema = new mongoose.Schema(
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: [true, "User ID is required"],
+      required: false, // Optional for global admin-created unit types
       index: true,
     },
     name: {
@@ -27,15 +27,35 @@ const unitTypeSchema = new mongoose.Schema(
       enum: ["active", "inactive"],
       default: "active",
     },
+    isGlobal: {
+      type: Boolean,
+      default: false, // True for admin-created global unit types
+    },
   },
   {
     timestamps: true,
   }
 );
 
-// Compound unique indexes - name and abbreviation must be unique per user
-unitTypeSchema.index({ userId: 1, name: 1 }, { unique: true });
-unitTypeSchema.index({ userId: 1, abbreviation: 1 }, { unique: true });
+// Unique indexes for global unit types
+unitTypeSchema.index(
+  { name: 1 },
+  { unique: true, partialFilterExpression: { isGlobal: true } }
+);
+unitTypeSchema.index(
+  { abbreviation: 1 },
+  { unique: true, partialFilterExpression: { isGlobal: true } }
+);
+
+// Compound unique indexes - name and abbreviation must be unique per user for non-global unit types
+unitTypeSchema.index(
+  { userId: 1, name: 1 },
+  { unique: true, partialFilterExpression: { isGlobal: { $ne: true } } }
+);
+unitTypeSchema.index(
+  { userId: 1, abbreviation: 1 },
+  { unique: true, partialFilterExpression: { isGlobal: { $ne: true } } }
+);
 
 const UnitType = mongoose.models.UnitType || mongoose.model("UnitType", unitTypeSchema);
 

@@ -13,7 +13,7 @@ export async function GET(request, { params }) {
     if (error) return error;
     
     const { id } = await params;
-    const unitType = await UnitType.findOne({ _id: id, userId });
+    const unitType = await UnitType.findById(id);
     
     if (!unitType) {
       return NextResponse.json(
@@ -42,14 +42,26 @@ export async function GET(request, { params }) {
   }
 }
 
-// PUT - Update unit type by ID
+// PUT - Update unit type by ID (Admin only)
 export async function PUT(request, { params }) {
   try {
     await _db();
     
-    // Verify user is authenticated
+    // Verify user is authenticated and is admin
     const { error, userId } = requireAuth(request);
     if (error) return error;
+    
+    // Get user role from request headers
+    const role = request.headers.get("X-User-Role");
+    if (role !== "admin") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Unauthorized. Only admins can update unit types.",
+        },
+        { status: 403 }
+      );
+    }
     
     const { id } = await params;
     const body = await request.json();
@@ -76,8 +88,8 @@ export async function PUT(request, { params }) {
       );
     }
     
-    // Check if unit type exists and belongs to user
-    const existingUnitType = await UnitType.findOne({ _id: id, userId });
+    // Check if unit type exists
+    const existingUnitType = await UnitType.findById(id);
     if (!existingUnitType) {
       return NextResponse.json(
         {
@@ -88,9 +100,8 @@ export async function PUT(request, { params }) {
       );
     }
     
-    // Check if another unit type with the same name or abbreviation exists for this user (excluding current one)
+    // Check if another unit type with the same name or abbreviation exists (excluding current one)
     const duplicateUnitType = await UnitType.findOne({
-      userId,
       _id: { $ne: id },
       $or: [
         { name: { $regex: new RegExp(`^${name}$`, 'i') } },
@@ -150,19 +161,31 @@ export async function PUT(request, { params }) {
   }
 }
 
-// DELETE - Delete unit type by ID
+// DELETE - Delete unit type by ID (Admin only)
 export async function DELETE(request, { params }) {
   try {
     await _db();
     
-    // Verify user is authenticated
+    // Verify user is authenticated and is admin
     const { error, userId } = requireAuth(request);
     if (error) return error;
     
+    // Get user role from request headers
+    const role = request.headers.get("X-User-Role");
+    if (role !== "admin") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Unauthorized. Only admins can delete unit types.",
+        },
+        { status: 403 }
+      );
+    }
+    
     const { id } = await params;
     
-    // Check if unit type exists and belongs to user
-    const unitType = await UnitType.findOne({ _id: id, userId });
+    // Check if unit type exists
+    const unitType = await UnitType.findById(id);
     if (!unitType) {
       return NextResponse.json(
         {

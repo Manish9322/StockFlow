@@ -35,6 +35,32 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
     headers["Authorization"] = `Bearer ${token}`
   }
 
+  // Add user role header for authorization
+  if (typeof window !== "undefined") {
+    const isAdminRoute = window.location.pathname.startsWith("/admin")
+    if (isAdminRoute) {
+      const adminUser = localStorage.getItem("adminUser")
+      if (adminUser) {
+        try {
+          const user = JSON.parse(adminUser)
+          headers["X-User-Role"] = user.role || "user"
+        } catch (e) {
+          headers["X-User-Role"] = "user"
+        }
+      }
+    } else {
+      const user = localStorage.getItem("user")
+      if (user) {
+        try {
+          const userData = JSON.parse(user)
+          headers["X-User-Role"] = userData.role || "user"
+        } catch (e) {
+          headers["X-User-Role"] = "user"
+        }
+      }
+    }
+  }
+
   const response = await fetch(url, {
     ...options,
     headers,

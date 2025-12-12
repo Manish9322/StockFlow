@@ -66,7 +66,7 @@ function AdminUnitTypesContent() {
   const [updateUnitType, { isLoading: isUpdating }] = useUpdateUnitTypeMutation()
   const [deleteUnitType, { isLoading: isDeleting }] = useDeleteUnitTypeMutation()
 
-  const unitTypes: UnitType[] = unitTypesData?.unitTypes || []
+  const unitTypes: UnitType[] = unitTypesData?.data || []
 
   const filteredUnitTypes = unitTypes.filter(unit =>
     unit.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

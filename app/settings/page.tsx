@@ -1096,12 +1096,8 @@ function SettingsContent() {
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h2 className="text-lg font-semibold text-foreground">Product Categories</h2>
-                    <p className="text-sm text-muted-foreground">Manage your product categories</p>
+                    <p className="text-sm text-muted-foreground">View available categories (managed by admin)</p>
                   </div>
-                  <Button onClick={openAddModal} className="flex items-center gap-2">
-                    <Plus className="w-4 h-4" />
-                    Add Category
-                  </Button>
                 </div>
 
                 {/* Search Bar */}
@@ -1126,11 +1122,8 @@ function SettingsContent() {
                   </div>
                 ) : categories.length === 0 ? (
                   <div className="text-center py-12">
-                    <p className="text-sm text-muted-foreground mb-4">No categories yet.</p>
-                    <Button onClick={openAddModal} variant="outline">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Your First Category
-                    </Button>
+                    <p className="text-sm text-muted-foreground mb-4">No categories available yet.</p>
+                    <p className="text-xs text-muted-foreground">Categories are managed by the admin.</p>
                   </div>
                 ) : (
                   <div className="border border-border rounded-lg overflow-hidden">
@@ -1171,21 +1164,6 @@ function SettingsContent() {
                                   >
                                     <Eye className="w-4 h-4 text-muted-foreground" />
                                   </button>
-                                  <button
-                                    onClick={() => openEditModal(cat)}
-                                    className="p-1.5 hover:bg-muted rounded transition-colors"
-                                    title="Edit"
-                                  >
-                                    <Pencil className="w-4 h-4 text-muted-foreground" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleRemoveCategory(cat._id)}
-                                    disabled={isDeleting}
-                                    className="p-1.5 hover:bg-muted rounded transition-colors disabled:opacity-50"
-                                    title="Delete"
-                                  >
-                                    <Trash2 className="w-4 h-4 text-red-500" />
-                                  </button>
                                 </div>
                               </td>
                             </tr>
@@ -1203,12 +1181,8 @@ function SettingsContent() {
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h2 className="text-lg font-semibold text-foreground">Unit Types</h2>
-                    <p className="text-sm text-muted-foreground">Manage measurement unit types</p>
+                    <p className="text-sm text-muted-foreground">View available measurement units (managed by admin)</p>
                   </div>
-                  <Button onClick={openAddUnitModal} className="flex items-center gap-2">
-                    <Plus className="w-4 h-4" />
-                    Add Unit Type
-                  </Button>
                 </div>
 
                 {/* Search Bar */}
@@ -1243,11 +1217,8 @@ function SettingsContent() {
                   </div>
                 ) : unitTypes.length === 0 ? (
                   <div className="text-center py-12">
-                    <p className="text-sm text-muted-foreground mb-4">No unit types yet.</p>
-                    <Button onClick={openAddUnitModal} variant="outline">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Your First Unit Type
-                    </Button>
+                    <p className="text-sm text-muted-foreground mb-4">No unit types available yet.</p>
+                    <p className="text-xs text-muted-foreground">Unit types are managed by the admin.</p>
                   </div>
                 ) : (
                   <div className="border border-border rounded-lg overflow-hidden">
@@ -1294,21 +1265,6 @@ function SettingsContent() {
                                   >
                                     <Eye className="w-4 h-4 text-muted-foreground" />
                                   </button>
-                                  <button
-                                    onClick={() => openEditUnitModal(unit)}
-                                    className="p-1.5 hover:bg-muted rounded transition-colors"
-                                    title="Edit"
-                                  >
-                                    <Pencil className="w-4 h-4 text-muted-foreground" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleRemoveUnitType(unit._id)}
-                                    disabled={isDeletingUnit}
-                                    className="p-1.5 hover:bg-muted rounded transition-colors disabled:opacity-50"
-                                    title="Delete"
-                                  >
-                                    <Trash2 className="w-4 h-4 text-red-500" />
-                                  </button>
                                 </div>
                               </td>
                             </tr>
@@ -1326,7 +1282,7 @@ function SettingsContent() {
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h2 className="text-lg font-semibold text-foreground">Tax Management</h2>
-                    <p className="text-sm text-muted-foreground">Configure taxes applied to purchases</p>
+                    <p className="text-sm text-muted-foreground">View tax configurations (managed by admin)</p>
                   </div>
                 </div>
 
@@ -1341,20 +1297,15 @@ function SettingsContent() {
                       <div className="flex items-center justify-between">
                         <div>
                           <h3 className="text-base font-semibold text-foreground">GST (Goods and Services Tax)</h3>
-                          <p className="text-xs text-muted-foreground">Configure GST settings for purchases</p>
+                          <p className="text-xs text-muted-foreground">GST settings (admin configured)</p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <label className="text-sm text-foreground">Enable</label>
+                          <label className="text-sm text-foreground">Status</label>
                           <input
                             type="checkbox"
                             checked={taxConfig.gst.enabled}
-                            onChange={(e) =>
-                              setTaxConfig((prev) => ({
-                                ...prev,
-                                gst: { ...prev.gst, enabled: e.target.checked },
-                              }))
-                            }
-                            className="w-4 h-4 rounded border border-border"
+                            disabled
+                            className="w-4 h-4 rounded border border-border opacity-60 cursor-not-allowed"
                           />
                         </div>
                       </div>
@@ -1365,29 +1316,17 @@ function SettingsContent() {
                             <label className="block text-sm font-medium text-foreground mb-2">GST Rate (%)</label>
                             <Input
                               type="number"
-                              min="0"
-                              max="100"
-                              step="0.01"
                               value={taxConfig.gst.rate}
-                              onChange={(e) =>
-                                setTaxConfig((prev) => ({
-                                  ...prev,
-                                  gst: { ...prev.gst, rate: parseFloat(e.target.value) || 0 },
-                                }))
-                              }
+                              disabled
+                              className="opacity-60 cursor-not-allowed"
                             />
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-foreground mb-2">Tax Type</label>
                             <select
                               value={taxConfig.gst.type}
-                              onChange={(e) =>
-                                setTaxConfig((prev) => ({
-                                  ...prev,
-                                  gst: { ...prev.gst, type: e.target.value as "inclusive" | "exclusive" },
-                                }))
-                              }
-                              className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                              disabled
+                              className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring opacity-60 cursor-not-allowed"
                             >
                               <option value="exclusive">Exclusive (Added to subtotal)</option>
                               <option value="inclusive">Inclusive (Included in price)</option>
@@ -1398,13 +1337,8 @@ function SettingsContent() {
                             <Input
                               type="text"
                               value={taxConfig.gst.description}
-                              onChange={(e) =>
-                                setTaxConfig((prev) => ({
-                                  ...prev,
-                                  gst: { ...prev.gst, description: e.target.value },
-                                }))
-                              }
-                              placeholder="Enter GST description"
+                              disabled
+                              className="opacity-60 cursor-not-allowed"
                             />
                           </div>
                         </div>
@@ -1416,20 +1350,15 @@ function SettingsContent() {
                       <div className="flex items-center justify-between">
                         <div>
                           <h3 className="text-base font-semibold text-foreground">Platform Fee</h3>
-                          <p className="text-xs text-muted-foreground">Configure platform transaction fees</p>
+                          <p className="text-xs text-muted-foreground">Platform fee settings (admin configured)</p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <label className="text-sm text-foreground">Enable</label>
+                          <label className="text-sm text-foreground">Status</label>
                           <input
                             type="checkbox"
                             checked={taxConfig.platformFee.enabled}
-                            onChange={(e) =>
-                              setTaxConfig((prev) => ({
-                                ...prev,
-                                platformFee: { ...prev.platformFee, enabled: e.target.checked },
-                              }))
-                            }
-                            className="w-4 h-4 rounded border border-border"
+                            disabled
+                            className="w-4 h-4 rounded border border-border opacity-60 cursor-not-allowed"
                           />
                         </div>
                       </div>
@@ -1440,28 +1369,17 @@ function SettingsContent() {
                             <label className="block text-sm font-medium text-foreground mb-2">Fee Amount</label>
                             <Input
                               type="number"
-                              min="0"
-                              step="0.01"
                               value={taxConfig.platformFee.rate}
-                              onChange={(e) =>
-                                setTaxConfig((prev) => ({
-                                  ...prev,
-                                  platformFee: { ...prev.platformFee, rate: parseFloat(e.target.value) || 0 },
-                                }))
-                              }
+                              disabled
+                              className="opacity-60 cursor-not-allowed"
                             />
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-foreground mb-2">Fee Type</label>
                             <select
                               value={taxConfig.platformFee.type}
-                              onChange={(e) =>
-                                setTaxConfig((prev) => ({
-                                  ...prev,
-                                  platformFee: { ...prev.platformFee, type: e.target.value as "percentage" | "fixed" },
-                                }))
-                              }
-                              className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                              disabled
+                              className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring opacity-60 cursor-not-allowed"
                             >
                               <option value="percentage">Percentage (%)</option>
                               <option value="fixed">Fixed Amount</option>
@@ -1472,13 +1390,8 @@ function SettingsContent() {
                             <Input
                               type="text"
                               value={taxConfig.platformFee.description}
-                              onChange={(e) =>
-                                setTaxConfig((prev) => ({
-                                  ...prev,
-                                  platformFee: { ...prev.platformFee, description: e.target.value },
-                                }))
-                              }
-                              placeholder="Enter platform fee description"
+                              disabled
+                              className="opacity-60 cursor-not-allowed"
                             />
                           </div>
                         </div>
@@ -1490,12 +1403,8 @@ function SettingsContent() {
                       <div className="flex items-center justify-between">
                         <div>
                           <h3 className="text-base font-semibold text-foreground">Other Taxes</h3>
-                          <p className="text-xs text-muted-foreground">Add custom tax types</p>
+                          <p className="text-xs text-muted-foreground">View custom tax types (admin configured)</p>
                         </div>
-                        <Button onClick={openAddOtherTaxModal} size="sm" className="flex items-center gap-2">
-                          <Plus className="w-4 h-4" />
-                          Add Tax
-                        </Button>
                       </div>
 
                       {taxConfig.otherTaxes.length > 0 ? (
@@ -1509,8 +1418,8 @@ function SettingsContent() {
                                 <input
                                   type="checkbox"
                                   checked={tax.enabled}
-                                  onChange={() => handleToggleOtherTax(index)}
-                                  className="w-4 h-4 rounded border border-border"
+                                  disabled
+                                  className="w-4 h-4 rounded border border-border opacity-60 cursor-not-allowed"
                                 />
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2">
@@ -1524,22 +1433,6 @@ function SettingsContent() {
                                     <p className="text-xs text-muted-foreground mt-0.5">{tax.description}</p>
                                   )}
                                 </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => openEditOtherTaxModal(tax, index)}
-                                  className="p-1.5 hover:bg-muted rounded transition-colors"
-                                  title="Edit"
-                                >
-                                  <Pencil className="w-4 h-4 text-muted-foreground" />
-                                </button>
-                                <button
-                                  onClick={() => handleRemoveOtherTax(index)}
-                                  className="p-1.5 hover:bg-muted rounded transition-colors"
-                                  title="Remove"
-                                >
-                                  <Trash2 className="w-4 h-4 text-red-500" />
-                                </button>
                               </div>
                             </div>
                           ))}
@@ -1584,17 +1477,6 @@ function SettingsContent() {
                         </div>
                       </div>
                     )}
-
-                    <Button onClick={handleSaveTaxConfig} disabled={isUpdatingTax} className="w-full">
-                      {isUpdatingTax ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        "Save Tax Configuration"
-                      )}
-                    </Button>
                   </div>
                 )}
               </div>
@@ -1796,15 +1678,6 @@ function SettingsContent() {
                 className="flex-1"
               >
                 Close
-              </Button>
-              <Button
-                onClick={() => {
-                  setShowViewModal(false)
-                  openEditModal(selectedCategory)
-                }}
-                className="flex-1"
-              >
-                Edit Category
               </Button>
             </div>
           </div>
@@ -2011,15 +1884,6 @@ function SettingsContent() {
                 className="flex-1"
               >
                 Close
-              </Button>
-              <Button
-                onClick={() => {
-                  setShowViewUnitModal(false)
-                  openEditUnitModal(selectedUnitType)
-                }}
-                className="flex-1"
-              >
-                Edit Unit Type
               </Button>
             </div>
           </div>

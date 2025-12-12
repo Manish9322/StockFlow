@@ -64,7 +64,7 @@ function AdminCategoriesContent() {
   const [updateCategory, { isLoading: isUpdating }] = useUpdateCategoryMutation()
   const [deleteCategory, { isLoading: isDeleting }] = useDeleteCategoryMutation()
 
-  const categories: Category[] = categoriesData?.categories || []
+  const categories: Category[] = categoriesData?.data || []
 
   const filteredCategories = categories.filter(cat =>
     cat.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

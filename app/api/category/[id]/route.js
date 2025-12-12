@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import _db from "@/lib/utils/db";
 import Category from "@/models/category.model";
+import { requireAuth } from "@/lib/auth-helpers";
 
 // GET - Fetch single category by ID
 export async function GET(request, { params }) {
@@ -37,10 +38,26 @@ export async function GET(request, { params }) {
   }
 }
 
-// PUT - Update category by ID
+// PUT - Update category by ID (Admin only)
 export async function PUT(request, { params }) {
   try {
     await _db();
+    
+    // Verify user is authenticated and is admin
+    const { error, userId } = requireAuth(request);
+    if (error) return error;
+    
+    // Get user role from request headers
+    const role = request.headers.get("X-User-Role");
+    if (role !== "admin") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Unauthorized. Only admins can update categories.",
+        },
+        { status: 403 }
+      );
+    }
     
     const { id } = await params;
     const body = await request.json();
@@ -126,10 +143,26 @@ export async function PUT(request, { params }) {
   }
 }
 
-// DELETE - Delete category by ID
+// DELETE - Delete category by ID (Admin only)
 export async function DELETE(request, { params }) {
   try {
     await _db();
+    
+    // Verify user is authenticated and is admin
+    const { error, userId } = requireAuth(request);
+    if (error) return error;
+    
+    // Get user role from request headers
+    const role = request.headers.get("X-User-Role");
+    if (role !== "admin") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Unauthorized. Only admins can delete categories.",
+        },
+        { status: 403 }
+      );
+    }
     
     const { id } = await params;
     
