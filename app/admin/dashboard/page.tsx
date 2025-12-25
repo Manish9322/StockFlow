@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useMemo } from "react"
 import MainLayout from "@/components/layout/main-layout"
 import { AdminRoute } from "@/components/admin-route"
 import { Badge } from "@/components/ui/badge"
@@ -8,6 +8,10 @@ import { Button } from "@/components/ui/button"
 import { 
   useGetStatisticsQuery,
   useGetAllUsersQuery,
+  useGetMovementsQuery,
+  useGetCategoriesQuery,
+  useGetUnitTypesQuery,
+  useGetProductsQuery,
 } from "@/lib/utils/services/api"
 import { 
   AlertCircle,
@@ -18,13 +22,60 @@ import {
   TrendingUp,
 } from "lucide-react"
 import Link from "next/link"
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 
 function AdminDashboardContent() {
   const { data: statsData, isLoading: statsLoading, refetch: refetchStats } = useGetStatisticsQuery(undefined)
   const { data: usersData } = useGetAllUsersQuery({ status: "all", role: "all" })
+  const { data: movementsData } = useGetMovementsQuery({})
+  const { data: categoriesData } = useGetCategoriesQuery({})
+  const { data: unitTypesData } = useGetUnitTypesQuery({})
+  const { data: productsData } = useGetProductsQuery({})
 
   const statistics = statsData?.statistics || null
   const recentUsers = usersData?.users?.slice(0, 5) || []
+  const movements = movementsData?.data || []
+  const categories = categoriesData?.data || []
+  const unitTypes = unitTypesData?.data || []
+  const products = productsData?.data || []
+
+  // Prepare data for User Activity Line Graph (last 30 days)
+  const userActivityData = useMemo(() => {
+    const last30Days = Array.from({ length: 30 }, (_, i) => {
+      const date = new Date()
+      date.setDate(date.getDate() - (29 - i))
+      return date.toISOString().split('T')[0]
+    })
+
+    return last30Days.map(date => {
+      const count = movements.filter((m: any) => {
+        const movementDate = new Date(m.createdAt).toISOString().split('T')[0]
+        return movementDate === date
+      }).length
+      const d = new Date(date)
+      return {
+        date: `${d.getMonth() + 1}/${d.getDate()}`,
+        activities: count
+      }
+    })
+  }, [movements])
+
+  // Prepare data for Category/Unit Type Bar Chart
+  const categoryUnitData = useMemo(() => {
+    // Count products per category
+    const categoryCount = categories.map((cat: any) => {
+      const count = products.filter((p: any) => p.category?._id === cat._id).length
+      return { name: cat.name, count, type: 'Category' }
+    }).slice(0, 5) // Top 5 categories
+
+    // Count products per unit type
+    const unitTypeCount = unitTypes.map((unit: any) => {
+      const count = products.filter((p: any) => p.unitType?._id === unit._id).length
+      return { name: unit.abbreviation, count, type: 'Unit' }
+    }).slice(0, 5) // Top 5 unit types
+
+    return [...categoryCount, ...unitTypeCount]
+  }, [categories, unitTypes, products])
 
   const statCards = [
     {
@@ -137,6 +188,81 @@ function AdminDashboardContent() {
                 </Link>
               )
             })}
+          </div>
+        </div>
+
+        {/* Graphs Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* User Activity Line Graph */}
+          <div className="bg-card border border-border rounded-lg p-4 md:p-6">
+            <div className="mb-4">
+              <h3 className="font-semibold text-foreground">User Activity Trend</h3>
+              <p className="text-xs text-muted-foreground mt-1">Activities over the last 30 days</p>
+            </div>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={userActivityData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis 
+                    dataKey="date" 
+                    stroke="hsl(var(--muted-foreground))" 
+                    fontSize={12}
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                  />
+                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <Tooltip 
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '6px',
+                    }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="activities" 
+                    stroke="hsl(var(--primary))" 
+                    strokeWidth={2}
+                    dot={{ fill: 'hsl(var(--primary))', r: 3 }}
+                    activeDot={{ r: 5 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Category & Unit Type Bar Chart */}
+          <div className="bg-card border border-border rounded-lg p-4 md:p-6">
+            <div className="mb-4">
+              <h3 className="font-semibold text-foreground">Categories & Unit Types Usage</h3>
+              <p className="text-xs text-muted-foreground mt-1">Top 5 categories and unit types by product count</p>
+            </div>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={categoryUnitData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis 
+                    dataKey="name" 
+                    stroke="hsl(var(--muted-foreground))" 
+                    fontSize={12}
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                  />
+                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <Tooltip 
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '6px',
+                    }}
+                  />
+                  <Legend />
+                  <Bar dataKey="count" fill="hsl(var(--primary))" name="Product Count" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
 

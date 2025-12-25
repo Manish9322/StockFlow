@@ -27,6 +27,7 @@ export default function Sidebar({ isOpen, onNavigate }: SidebarProps) {
     { href: "/admin/products", label: "All Products", icon: Package },
     { href: "/admin/categories", label: "Categories", icon: FolderTree },
     { href: "/admin/unit-types", label: "Unit Types", icon: Ruler },
+    { href: "/admin/tax-management", label: "Tax Management", icon: BarChart3 },
     { href: "/admin/activities", label: "System Activities", icon: Activity },
     { href: "/admin/settings", label: "Admin Settings", icon: Settings },
   ]

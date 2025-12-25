@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import _db from "@/lib/utils/db";
 import UnitType from "@/models/unitType.model";
+import Movement from "@/models/movement.model";
 import { requireAuth } from "@/lib/auth-helpers";
 
 // GET - Fetch all unit types
@@ -106,6 +107,34 @@ export async function POST(request) {
       status: status || "active",
       isGlobal: true, // Mark as global admin-created unit type
     });
+    
+    // Log movement
+    try {
+      await Movement.create({
+        eventType: "unitType.created",
+        eventTitle: "Unit Type Created",
+        description: `Created new unit type: ${unitType.name} (${unitType.abbreviation})`,
+        userId: userId,
+        userName: "Admin",
+        relatedUnitType: unitType._id,
+        metadata: {
+          name: unitType.name,
+          abbreviation: unitType.abbreviation,
+          description: unitType.description,
+        },
+        changes: {
+          after: {
+            name: unitType.name,
+            abbreviation: unitType.abbreviation,
+            description: unitType.description,
+            status: unitType.status,
+          },
+        },
+      });
+    } catch (logError) {
+      console.error("Error logging movement:", logError);
+      // Don't fail the request if logging fails
+    }
     
     return NextResponse.json(
       {

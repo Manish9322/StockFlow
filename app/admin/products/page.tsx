@@ -49,7 +49,12 @@ interface Product {
   supplier: string
   minStockAlert: number
   lowStockThreshold: number
-  userId: string
+  userId: {
+    _id: string
+    name: string
+    email: string
+    company?: string
+  }
 }
 
 function AdminProductsContent() {
@@ -223,6 +228,7 @@ function AdminProductsContent() {
                   <TableHead>Product Name</TableHead>
                   <TableHead>SKU</TableHead>
                   <TableHead>Category</TableHead>
+                  <TableHead>User/Owner</TableHead>
                   <TableHead>Quantity</TableHead>
                   <TableHead>Unit</TableHead>
                   <TableHead>Cost Price</TableHead>
@@ -234,7 +240,7 @@ function AdminProductsContent() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8">
+                    <TableCell colSpan={10} className="text-center py-8">
                       <div className="flex items-center justify-center gap-2">
                         <RefreshCw className="w-4 h-4 animate-spin" />
                         Loading products...
@@ -243,7 +249,7 @@ function AdminProductsContent() {
                   </TableRow>
                 ) : paginatedProducts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       No products found
                     </TableCell>
                   </TableRow>
@@ -253,6 +259,15 @@ function AdminProductsContent() {
                       <TableCell className="font-medium">{product.name}</TableCell>
                       <TableCell className="font-mono text-sm">{product.sku}</TableCell>
                       <TableCell>{product.category?.name || "-"}</TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="text-sm font-medium">{product.userId?.name || "Unknown"}</p>
+                          <p className="text-xs text-muted-foreground">{product.userId?.email || "-"}</p>
+                          {product.userId?.company && (
+                            <p className="text-xs text-muted-foreground">{product.userId.company}</p>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="font-semibold">{product.quantity}</TableCell>
                       <TableCell>{product.unitType?.abbreviation || "-"}</TableCell>
                       <TableCell>${product.costPrice.toFixed(2)}</TableCell>

@@ -27,6 +27,15 @@ export type EventType =
   | "settings.changed"
   | "auth.login"
   | "auth.logout"
+  | "user.created"
+  | "user.updated"
+  | "user.deleted"
+  | "unitType.created"
+  | "unitType.updated"
+  | "unitType.deleted"
+  | "tax.created"
+  | "tax.updated"
+  | "tax.deleted"
 
 interface Movement {
   _id: string
@@ -163,6 +172,15 @@ function MovementHistoryContent() {
     { value: "settings.changed", label: "Settings Changed" },
     { value: "auth.login", label: "Login" },
     { value: "auth.logout", label: "Logout" },
+    { value: "user.created", label: "User Created" },
+    { value: "user.updated", label: "User Updated" },
+    { value: "user.deleted", label: "User Deleted" },
+    { value: "unitType.created", label: "Unit Type Created" },
+    { value: "unitType.updated", label: "Unit Type Updated" },
+    { value: "unitType.deleted", label: "Unit Type Deleted" },
+    { value: "tax.created", label: "Tax Created" },
+    { value: "tax.updated", label: "Tax Updated" },
+    { value: "tax.deleted", label: "Tax Deleted" },
   ]
 
   const getEventColor = (eventType: EventType) => {

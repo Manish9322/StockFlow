@@ -2,6 +2,8 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
+import { store } from "./store"
+import { api } from "./utils/services/api"
 
 interface User {
   id: string
@@ -27,6 +29,18 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+// Helper function to decode JWT and check if it's expired
+function isTokenExpired(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    const expirationTime = payload.exp * 1000 // Convert to milliseconds
+    return Date.now() >= expirationTime
+  } catch (error) {
+    console.error("Error decoding token:", error)
+    return true // Treat invalid tokens as expired
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState<string | null>(null)
@@ -43,8 +57,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (storedUser && storedToken) {
         try {
-          setUser(JSON.parse(storedUser))
-          setToken(storedToken)
+          // Check if token is expired
+          if (isTokenExpired(storedToken)) {
+            console.log("Regular user token expired, clearing session")
+            localStorage.removeItem("user")
+            localStorage.removeItem("token")
+          } else {
+            setUser(JSON.parse(storedUser))
+            setToken(storedToken)
+          }
         } catch (error) {
           console.error("Failed to parse stored user:", error)
           localStorage.removeItem("user")
@@ -58,8 +79,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (storedAdminUser && storedAdminToken) {
         try {
-          setAdminUser(JSON.parse(storedAdminUser))
-          setAdminToken(storedAdminToken)
+          // Check if admin token is expired
+          if (isTokenExpired(storedAdminToken)) {
+            console.log("Admin token expired, clearing session")
+            localStorage.removeItem("adminUser")
+            localStorage.removeItem("adminToken")
+          } else {
+            setAdminUser(JSON.parse(storedAdminUser))
+            setAdminToken(storedAdminToken)
+          }
         } catch (error) {
           console.error("Failed to parse stored admin user:", error)
           localStorage.removeItem("adminUser")
@@ -96,6 +124,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const authToken = data.data.token
+
+      // Clear RTK Query cache before setting new user data
+      store.dispatch(api.util.resetApiState())
 
       setUser(userData)
       setToken(authToken)
@@ -139,6 +170,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const authToken = data.data.token
 
+      // Clear RTK Query cache before setting new admin user data
+      store.dispatch(api.util.resetApiState())
+
       setAdminUser(userData)
       setAdminToken(authToken)
 
@@ -181,6 +215,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const authToken = data.data.token
 
+      // Clear RTK Query cache before setting new user data
+      store.dispatch(api.util.resetApiState())
+
       setUser(userData)
       setToken(authToken)
 
@@ -207,6 +244,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }).catch(err => console.error("Logout API error:", err))
     }
 
+    // Clear RTK Query cache on logout
+    store.dispatch(api.util.resetApiState())
+
     setUser(null)
     setToken(null)
     
@@ -228,6 +268,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       }).catch(err => console.error("Admin logout API error:", err))
     }
+
+    // Clear RTK Query cache on logout
+    store.dispatch(api.util.resetApiState())
 
     setAdminUser(null)
     setAdminToken(null)

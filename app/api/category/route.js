@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import _db from "@/lib/utils/db";
 import Category from "@/models/category.model";
+import Movement from "@/models/movement.model";
 import { requireAuth } from "@/lib/auth-helpers";
 
 // GET - Fetch all categories
@@ -92,6 +93,32 @@ export async function POST(request) {
       status: status || "active",
       isGlobal: true, // Mark as global admin-created category
     });
+    
+    // Log movement
+    try {
+      await Movement.create({
+        eventType: "category.created",
+        eventTitle: "Category Created",
+        description: `Created new category: ${category.name}`,
+        userId: userId,
+        userName: "Admin",
+        relatedCategory: category._id,
+        metadata: {
+          categoryName: category.name,
+          description: category.description,
+        },
+        changes: {
+          after: {
+            name: category.name,
+            description: category.description,
+            status: category.status,
+          },
+        },
+      });
+    } catch (logError) {
+      console.error("Error logging movement:", logError);
+      // Don't fail the request if logging fails
+    }
     
     return NextResponse.json(
       {

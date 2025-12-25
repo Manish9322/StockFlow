@@ -383,11 +383,15 @@ function PurchaseContent() {
                       <SelectValue placeholder={loading ? "Loading products..." : "Select a product"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {products.map((p) => (
-                        <SelectItem key={p._id} value={p._id}>
-                          {p.name} ({p.sku})
-                        </SelectItem>
-                      ))}
+                      {products.length === 0 ? (
+                        <div className="px-4 py-3 text-center text-sm text-muted-foreground">No products found</div>
+                      ) : (
+                        products.map((p) => (
+                          <SelectItem key={p._id} value={p._id}>
+                            {p.name} ({p.sku})
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import connectDB from "@/lib/utils/db";
 import User from "@/models/user.model";
+import Movement from "@/models/movement.model";
 import { verifyAuth } from "@/lib/auth-helpers";
 
 // GET - Fetch all users (admin only)
@@ -93,6 +94,9 @@ export async function PUT(request) {
     if (email !== undefined) updateData.email = email;
     if (company !== undefined) updateData.company = company;
 
+    // Get the user before update for change tracking
+    const userBefore = await User.findById(userId).select("-password");
+
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       updateData,
@@ -104,6 +108,41 @@ export async function PUT(request) {
         { error: "User not found" },
         { status: 404 }
       );
+    }
+
+    // Log movement
+    try {
+      await Movement.create({
+        eventType: "user.updated",
+        eventTitle: "User Updated",
+        description: `Updated user: ${updatedUser.name} (${updatedUser.email})`,
+        userId: authResult.user.id,
+        userName: authResult.user.name || "Admin",
+        userEmail: authResult.user.email,
+        relatedUser: updatedUser._id,
+        metadata: {
+          updatedFields: Object.keys(updateData),
+        },
+        changes: {
+          before: {
+            name: userBefore.name,
+            email: userBefore.email,
+            role: userBefore.role,
+            status: userBefore.status,
+            company: userBefore.company,
+          },
+          after: {
+            name: updatedUser.name,
+            email: updatedUser.email,
+            role: updatedUser.role,
+            status: updatedUser.status,
+            company: updatedUser.company,
+          },
+        },
+      });
+    } catch (logError) {
+      console.error("Error logging movement:", logError);
+      // Don't fail the request if logging fails
     }
 
     return NextResponse.json({
@@ -159,6 +198,29 @@ export async function DELETE(request) {
         { error: "User not found" },
         { status: 404 }
       );
+    }
+
+    // Log movement
+    try {
+      await Movement.create({
+        eventType: "user.deleted",
+        eventTitle: "User Deleted",
+        description: `Deleted user: ${deletedUser.name} (${deletedUser.email})`,
+        userId: authResult.user.id,
+        userName: authResult.user.name || "Admin",
+        userEmail: authResult.user.email,
+        metadata: {
+          deletedUser: {
+            id: deletedUser._id.toString(),
+            name: deletedUser.name,
+            email: deletedUser.email,
+            role: deletedUser.role,
+          },
+        },
+      });
+    } catch (logError) {
+      console.error("Error logging movement:", logError);
+      // Don't fail the request if logging fails
     }
 
     return NextResponse.json({

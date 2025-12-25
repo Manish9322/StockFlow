@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/utils/db";
 import TaxConfig from "@/models/tax.model";
+import Movement from "@/models/movement.model";
 import { requireAuth } from "@/lib/auth-helpers";
 
 // GET: Get tax configuration for a user
@@ -103,6 +104,32 @@ export async function POST(request) {
         ],
         status: "active",
       });
+      
+      // Log movement for creation
+      try {
+        await Movement.create({
+          eventType: "tax.created",
+          eventTitle: "Tax Configuration Created",
+          description: changeDescription || "Created initial tax configuration",
+          userId: authUserId,
+          userName: changedBy || "Admin",
+          userEmail: changedByEmail,
+          metadata: {
+            gst: taxConfig.gst,
+            platformFee: taxConfig.platformFee,
+            otherTaxes: taxConfig.otherTaxes,
+          },
+          changes: {
+            after: {
+              gst: taxConfig.gst,
+              platformFee: taxConfig.platformFee,
+              otherTaxes: taxConfig.otherTaxes,
+            },
+          },
+        });
+      } catch (logError) {
+        console.error("Error logging movement:", logError);
+      }
     } else {
       // Update existing global configuration and track changes
       const oldConfig = {
@@ -129,6 +156,33 @@ export async function POST(request) {
       });
 
       await taxConfig.save();
+      
+      // Log movement for update
+      try {
+        await Movement.create({
+          eventType: "tax.updated",
+          eventTitle: "Tax Configuration Updated",
+          description: changeDescription || "Updated tax configuration",
+          userId: authUserId,
+          userName: changedBy || "Admin",
+          userEmail: changedByEmail,
+          metadata: {
+            gst: taxConfig.gst,
+            platformFee: taxConfig.platformFee,
+            otherTaxes: taxConfig.otherTaxes,
+          },
+          changes: {
+            before: oldConfig,
+            after: {
+              gst: taxConfig.gst,
+              platformFee: taxConfig.platformFee,
+              otherTaxes: taxConfig.otherTaxes,
+            },
+          },
+        });
+      } catch (logError) {
+        console.error("Error logging movement:", logError);
+      }
     }
 
     return NextResponse.json({
@@ -181,6 +235,23 @@ export async function DELETE(request) {
         { success: false, error: "Tax configuration not found" },
         { status: 404 }
       );
+    }
+
+    // Log movement for deletion
+    try {
+      await Movement.create({
+        eventType: "tax.deleted",
+        eventTitle: "Tax Configuration Deactivated",
+        description: "Deactivated tax configuration",
+        userId: authUserId,
+        userName: "Admin",
+        metadata: {
+          previousStatus: "active",
+          newStatus: "inactive",
+        },
+      });
+    } catch (logError) {
+      console.error("Error logging movement:", logError);
     }
 
     return NextResponse.json({

@@ -18,8 +18,12 @@ export async function GET(request) {
     const dateTo = searchParams.get("dateTo");
     const limit = searchParams.get("limit");
     
-    // Build query - always filter by authenticated userId
-    let query = { userId };
+    // Check if user is admin
+    const userRole = request.headers.get('X-User-Role');
+    const isAdmin = userRole === 'admin';
+    
+    // Build query - if admin, get all movements; otherwise, only user's movements
+    let query = isAdmin ? {} : { userId };
     
     if (eventType && eventType !== "all") {
       query.eventType = eventType;

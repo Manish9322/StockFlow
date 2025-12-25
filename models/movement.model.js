@@ -20,6 +20,15 @@ const movementSchema = new mongoose.Schema(
         "settings.changed",
         "auth.login",
         "auth.logout",
+        "user.created",
+        "user.updated",
+        "user.deleted",
+        "unitType.created",
+        "unitType.updated",
+        "unitType.deleted",
+        "tax.created",
+        "tax.updated",
+        "tax.deleted",
       ],
     },
     eventTitle: {
@@ -58,6 +67,14 @@ const movementSchema = new mongoose.Schema(
     relatedCategory: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Category",
+    },
+    relatedUser: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    relatedUnitType: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "UnitType",
     },
     // Additional metadata for the event
     metadata: {

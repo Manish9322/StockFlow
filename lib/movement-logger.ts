@@ -15,6 +15,15 @@ export type EventType =
   | "settings.changed"
   | "auth.login"
   | "auth.logout"
+  | "user.created"
+  | "user.updated"
+  | "user.deleted"
+  | "unitType.created"
+  | "unitType.updated"
+  | "unitType.deleted"
+  | "tax.created"
+  | "tax.updated"
+  | "tax.deleted"
 
 interface LogMovementParams {
   eventType: EventType

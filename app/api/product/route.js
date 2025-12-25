@@ -15,9 +15,17 @@ export async function GET(request) {
     const { error, userId } = requireAuth(request);
     if (error) return error;
     
-    const products = await Product.find({ userId })
+    // Check if user is admin
+    const userRole = request.headers.get('X-User-Role');
+    const isAdmin = userRole === 'admin';
+    
+    // Build query - if admin, get all products; otherwise, only user's products
+    let query = isAdmin ? {} : { userId };
+    
+    const products = await Product.find(query)
       .populate("category", "name")
       .populate("unitType", "name abbreviation")
+      .populate("userId", "name email company")
       .sort({ createdAt: -1 });
     
     return NextResponse.json({
