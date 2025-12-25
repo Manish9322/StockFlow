@@ -7,8 +7,6 @@ import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/lib/auth-context"
 import { 
   useGetStatisticsQuery,
-  useGetCategoriesQuery,
-  useGetUnitTypesQuery,
 } from "@/lib/utils/services/api"
 import { 
   FolderTree,
@@ -26,10 +24,10 @@ import Link from "next/link"
 function AdminSettingsContent() {
   const { adminUser } = useAuth()
   const { data: statsData, refetch } = useGetStatisticsQuery(undefined)
-  const { data: categoriesData } = useGetCategoriesQuery({})
-  const { data: unitTypesData } = useGetUnitTypesQuery({})
 
   const statistics = statsData?.statistics || null
+
+  console.log("Stats on Settings page : ", statistics)
 
   const quickLinks = [
     {
@@ -45,7 +43,7 @@ function AdminSettingsContent() {
       description: "Manage product categories",
       icon: FolderTree,
       href: "/admin/categories",
-      stat: categoriesData?.categories?.length || 0,
+      stat: statistics?.system?.categories || 0,
       statLabel: "categories",
     },
     {
@@ -53,7 +51,7 @@ function AdminSettingsContent() {
       description: "Manage measurement units",
       icon: Ruler,
       href: "/admin/unit-types",
-      stat: unitTypesData?.unitTypes?.length || 0,
+      stat: statistics?.system?.unitTypes || 0,
       statLabel: "unit types",
     },
     {
@@ -91,6 +89,30 @@ function AdminSettingsContent() {
           <p className="text-sm md:text-base text-muted-foreground">
             System configuration and management
           </p>
+        </div>
+
+        
+        {/* System Statistics */}
+        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4 md:space-y-6">
+          <h2 className="text-lg font-semibold text-foreground">System Overview</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="bg-card border border-border rounded-lg p-4 md:p-6">
+              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Total Users</p>
+              <p className="text-2xl md:text-2xl font-semibold text-foreground">{statistics?.users?.total || 0}</p>
+            </div>
+            <div className="bg-card border border-border rounded-lg p-4 md:p-6">
+              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Products</p>
+              <p className="text-2xl md:text-2xl font-semibold text-foreground">{statistics?.products?.total || 0}</p>
+            </div>
+            <div className="bg-card border border-border rounded-lg p-4 md:p-6">
+              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Categories</p>
+              <p className="text-2xl md:text-2xl font-semibold text-foreground">{statistics?.system?.categories || 0}</p>
+            </div>
+            <div className="bg-card border border-border rounded-lg p-4 md:p-6">
+              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Unit Types</p>
+              <p className="text-2xl md:text-2xl font-semibold text-foreground">{statistics?.system?.unitTypes || 0}</p>
+            </div>
+          </div>
         </div>
 
         {/* Admin Profile */}
@@ -153,29 +175,6 @@ function AdminSettingsContent() {
                 </Link>
               )
             })}
-          </div>
-        </div>
-
-        {/* System Statistics */}
-        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4 md:space-y-6">
-          <h2 className="text-lg font-semibold text-foreground">System Overview</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-card border border-border rounded-lg p-4 md:p-6">
-              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Total Users</p>
-              <p className="text-2xl md:text-2xl font-semibold text-foreground">{statistics?.users?.total || 0}</p>
-            </div>
-            <div className="bg-card border border-border rounded-lg p-4 md:p-6">
-              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Admins</p>
-              <p className="text-2xl md:text-2xl font-semibold text-foreground">{statistics?.users?.admins || 0}</p>
-            </div>
-            <div className="bg-card border border-border rounded-lg p-4 md:p-6">
-              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Products</p>
-              <p className="text-2xl md:text-2xl font-semibold text-foreground">{statistics?.products?.total || 0}</p>
-            </div>
-            <div className="bg-card border border-border rounded-lg p-4 md:p-6">
-              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Recent Activity</p>
-              <p className="text-2xl md:text-2xl font-semibold text-foreground">{statistics?.activity?.recentActivity || 0}</p>
-            </div>
           </div>
         </div>
       </div>

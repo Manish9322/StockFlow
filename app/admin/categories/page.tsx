@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import MainLayout from "@/components/layout/main-layout"
 import { AdminRoute } from "@/components/admin-route"
 import { Button } from "@/components/ui/button"
@@ -15,6 +15,13 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
@@ -36,6 +43,8 @@ import {
   Trash2, 
   RefreshCw,
   Search,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 
@@ -58,6 +67,10 @@ function AdminCategoriesContent() {
     name: "",
     description: "",
   })
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [rowsPerPage, setRowsPerPage] = useState(10)
 
   const { data: categoriesData, isLoading, refetch } = useGetCategoriesQuery({})
   const [addCategory, { isLoading: isAdding }] = useAddCategoryMutation()
@@ -66,10 +79,22 @@ function AdminCategoriesContent() {
 
   const categories: Category[] = categoriesData?.data || []
 
-  const filteredCategories = categories.filter(cat =>
-    cat.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cat.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredCategories = useMemo(() => {
+    return categories.filter(cat =>
+      cat.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cat.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  }, [categories, searchTerm])
+  
+  // Pagination logic
+  const totalCategoriesCount = filteredCategories.length
+  const totalPages = Math.ceil(totalCategoriesCount / rowsPerPage)
+  
+  const paginatedCategories = useMemo(() => {
+    const startIndex = (currentPage - 1) * rowsPerPage
+    const endIndex = startIndex + rowsPerPage
+    return filteredCategories.slice(startIndex, endIndex)
+  }, [filteredCategories, currentPage, rowsPerPage])
 
   const handleAdd = async () => {
     if (!formData.name.trim()) {
@@ -151,7 +176,7 @@ function AdminCategoriesContent() {
         ) : (
           <div className="bg-card border border-border rounded-lg p-4 md:p-6">
             <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Total Categories</p>
-            <p className="text-2xl md:text-2xl font-semibold text-foreground">{categories.length}</p>
+            <p className="text-2xl md:text-2xl font-semibold text-foreground">{totalCategoriesCount}</p>
           </div>
         )}
 
@@ -189,7 +214,7 @@ function AdminCategoriesContent() {
 
         {/* Categories Table */}
         <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-foreground">Categories List ({filteredCategories.length})</h2>
+          <h2 className="text-lg font-semibold text-foreground">Categories List ({totalCategoriesCount})</h2>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -211,14 +236,14 @@ function AdminCategoriesContent() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : filteredCategories.length === 0 ? (
+                ) : paginatedCategories.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                       No categories found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredCategories.map((category) => (
+                  paginatedCategories.map((category) => (
                     <TableRow key={category._id}>
                       <TableCell className="font-medium">{category.name}</TableCell>
                       <TableCell className="text-muted-foreground">
@@ -258,6 +283,88 @@ function AdminCategoriesContent() {
               </TableBody>
             </Table>
           </div>
+          
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-2 py-4">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-muted-foreground">
+                  Rows per page:
+                </span>
+                <Select value={String(rowsPerPage)} onValueChange={(value: string) => {
+                  setRowsPerPage(Number(value))
+                  setCurrentPage(1) // Reset to first page when changing rows per page
+                }}>
+                  <SelectTrigger className="w-16 h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex items-center space-x-4">
+                <span className="text-sm text-muted-foreground">
+                  {paginatedCategories.length > 0 ? `${(currentPage - 1) * rowsPerPage + 1}-${Math.min(currentPage * rowsPerPage, totalCategoriesCount)} of ${totalCategoriesCount}` : `0 of ${totalCategoriesCount}`}
+                </span>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1 || isLoading}
+                    className="p-2"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        // Show all pages if total pages is 5 or less
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        // Show first 5 pages if current page is near the beginning
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        // Show last 5 pages if current page is near the end
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        // Show 2 before and 2 after current page
+                        pageNum = currentPage - 2 + i;
+                      }
+                      
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={currentPage === pageNum ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(pageNum)}
+                          disabled={isLoading}
+                          className="w-8 h-8 p-0"
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages || isLoading}
+                    className="p-2"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

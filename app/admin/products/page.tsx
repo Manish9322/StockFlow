@@ -62,7 +62,7 @@ function AdminProductsContent() {
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [stockStatus, setStockStatus] = useState("all")
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 10
+  const [rowsPerPage, setRowsPerPage] = useState(10)
 
   const { data: productsData, isLoading, refetch } = useGetProductsQuery({})
   const products: Product[] = productsData?.data || []
@@ -96,11 +96,12 @@ function AdminProductsContent() {
     })
   }, [products, searchTerm, categoryFilter, stockStatus])
 
-  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage)
-  const paginatedProducts = filteredProducts.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  )
+  const totalPages = Math.ceil(filteredProducts.length / rowsPerPage)
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (currentPage - 1) * rowsPerPage
+    const endIndex = startIndex + rowsPerPage
+    return filteredProducts.slice(startIndex, endIndex)
+  }, [filteredProducts, currentPage, rowsPerPage])
 
   const getStockBadge = (product: Product) => {
     const threshold = product.lowStockThreshold || product.minStockAlert || 10
@@ -257,7 +258,7 @@ function AdminProductsContent() {
                   paginatedProducts.map((product) => (
                     <TableRow key={product._id}>
                       <TableCell className="font-medium">{product.name}</TableCell>
-                      <TableCell className="font-mono text-sm">{product.sku}</TableCell>
+                      <TableCell className="text-md">{product.sku}</TableCell>
                       <TableCell>{product.category?.name || "-"}</TableCell>
                       <TableCell>
                         <div>
@@ -280,29 +281,84 @@ function AdminProductsContent() {
               </TableBody>
             </Table>
           </div>
-          {/* Pagination */}
+          {/* Pagination Controls */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-4 border-t border-border">
-              <p className="text-sm text-muted-foreground">
-                Page {currentPage} of {totalPages}
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
+            <div className="flex items-center justify-between px-2 py-4">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-muted-foreground">
+                  Rows per page:
+                </span>
+                <Select value={String(rowsPerPage)} onValueChange={(value) => {
+                  setRowsPerPage(Number(value))
+                  setCurrentPage(1) // Reset to first page when changing rows per page
+                }}>
+                  <SelectTrigger className="w-16 h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex items-center space-x-4">
+                <span className="text-sm text-muted-foreground">
+                  {paginatedProducts.length > 0 ? `${(currentPage - 1) * rowsPerPage + 1}-${Math.min(currentPage * rowsPerPage, filteredProducts.length)} of ${filteredProducts.length}` : `0 of ${filteredProducts.length}`}
+                </span>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1 || isLoading}
+                    className="p-2"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        // Show all pages if total pages is 5 or less
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        // Show first 5 pages if current page is near the beginning
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        // Show last 5 pages if current page is near the end
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        // Show 2 before and 2 after current page
+                        pageNum = currentPage - 2 + i;
+                      }
+                      
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={currentPage === pageNum ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(pageNum)}
+                          disabled={isLoading}
+                          className="w-8 h-8 p-0"
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages || isLoading}
+                    className="p-2"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           )}

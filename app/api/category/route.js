@@ -12,9 +12,6 @@ export async function GET(request) {
     // Verify user is authenticated
     const { error, userId } = requireAuth(request);
     if (error) return error;
-    
-    // Fetch global categories (admin-created) or user-specific categories
-    // For now, we only fetch global categories since all categories are admin-managed
     const categories = await Category.find({ isGlobal: true }).sort({ createdAt: -1 });
     
     return NextResponse.json({

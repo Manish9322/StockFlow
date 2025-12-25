@@ -23,6 +23,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 import { 
   useGetUnitTypesQuery, 
   useAddUnitTypeMutation, 
@@ -60,6 +76,8 @@ function AdminUnitTypesContent() {
     abbreviation: "",
     description: "",
   })
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
 
   const { data: unitTypesData, isLoading, refetch } = useGetUnitTypesQuery({})
   const [addUnitType, { isLoading: isAdding }] = useAddUnitTypeMutation()
@@ -73,6 +91,13 @@ function AdminUnitTypesContent() {
     unit.abbreviation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     unit.description?.toLowerCase().includes(searchTerm.toLowerCase())
   )
+
+  // Calculate pagination
+  const totalItems = filteredUnitTypes.length
+  const totalPages = Math.ceil(totalItems / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedUnitTypes = filteredUnitTypes.slice(startIndex, endIndex)
 
   const handleAdd = async () => {
     if (!formData.name.trim() || !formData.abbreviation.trim()) {
@@ -155,7 +180,7 @@ function AdminUnitTypesContent() {
         ) : (
           <div className="bg-card border border-border rounded-lg p-4 md:p-6">
             <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Total Unit Types</p>
-            <p className="text-2xl md:text-2xl font-semibold text-foreground">{unitTypes.length}</p>
+            <p className="text-2xl md:text-2xl font-semibold text-foreground">{filteredUnitTypes.length}</p>
           </div>
         )}
 
@@ -193,7 +218,31 @@ function AdminUnitTypesContent() {
 
         {/* Unit Types Table */}
         <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-foreground">Unit Types List ({filteredUnitTypes.length})</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <h2 className="text-lg font-semibold text-foreground">Unit Types List ({filteredUnitTypes.length})</h2>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Rows per page:</span>
+                <Select value={itemsPerPage.toString()} onValueChange={(value) => {
+                  setItemsPerPage(Number(value))
+                  setCurrentPage(1) // Reset to first page when changing items per page
+                }}>
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {startIndex + 1}-{Math.min(endIndex, totalItems)} of {totalItems}
+              </div>
+            </div>
+          </div>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -216,17 +265,17 @@ function AdminUnitTypesContent() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : filteredUnitTypes.length === 0 ? (
+                ) : paginatedUnitTypes.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       No unit types found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredUnitTypes.map((unitType) => (
+                  paginatedUnitTypes.map((unitType) => (
                     <TableRow key={unitType._id}>
                       <TableCell className="font-medium">{unitType.name}</TableCell>
-                      <TableCell className="font-mono font-semibold">{unitType.abbreviation}</TableCell>
+                      <TableCell className="font-semibold">{unitType.abbreviation}</TableCell>
                       <TableCell className="text-muted-foreground">
                         {unitType.description || "-"}
                       </TableCell>
@@ -264,6 +313,88 @@ function AdminUnitTypesContent() {
               </TableBody>
             </Table>
           </div>
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between pt-4">
+              <div className="text-sm text-muted-foreground mb-4 sm:mb-0">
+                Showing {startIndex + 1}-{Math.min(endIndex, totalItems)} of {totalItems} results
+              </div>
+              <Pagination className="w-full sm:w-auto">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (currentPage > 1) {
+                          setCurrentPage(currentPage - 1);
+                        }
+                      }}
+                      className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                    />
+                  </PaginationItem>
+                  {currentPage > 2 && (
+                    <>
+                      <PaginationItem>
+                        <PaginationLink href="#" onClick={(e) => { e.preventDefault(); setCurrentPage(1); }}>
+                          1
+                        </PaginationLink>
+                      </PaginationItem>
+                      {currentPage > 3 && (
+                        <PaginationItem>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      )}
+                    </>
+                  )}
+                  {currentPage > 1 && (
+                    <PaginationItem>
+                      <PaginationLink href="#" onClick={(e) => { e.preventDefault(); setCurrentPage(currentPage - 1); }}>
+                        {currentPage - 1}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )}
+                  <PaginationItem>
+                    <PaginationLink href="#" onClick={(e) => { e.preventDefault(); }} isActive>
+                      {currentPage}
+                    </PaginationLink>
+                  </PaginationItem>
+                  {currentPage < totalPages && (
+                    <PaginationItem>
+                      <PaginationLink href="#" onClick={(e) => { e.preventDefault(); setCurrentPage(currentPage + 1); }}>
+                        {currentPage + 1}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )}
+                  {currentPage < totalPages - 1 && (
+                    <>
+                      {currentPage < totalPages - 2 && (
+                        <PaginationItem>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      )}
+                      <PaginationItem>
+                        <PaginationLink href="#" onClick={(e) => { e.preventDefault(); setCurrentPage(totalPages); }}>
+                          {totalPages}
+                        </PaginationLink>
+                      </PaginationItem>
+                    </>
+                  )}
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (currentPage < totalPages) {
+                          setCurrentPage(currentPage + 1);
+                        }
+                      }}
+                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </div>
       </div>
 
