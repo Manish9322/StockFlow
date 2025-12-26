@@ -19,8 +19,21 @@ export async function GET(request) {
     const userRole = request.headers.get('X-User-Role');
     const isAdmin = userRole === 'admin';
     
+    // Get search query from URL parameters
+    const url = new URL(request.url);
+    const search = url.searchParams.get('search');
+    
     // Build query - if admin, get all products; otherwise, only user's products
     let query = isAdmin ? {} : { userId };
+    
+    // Add search functionality if search parameter is provided
+    if (search) {
+      const searchRegex = new RegExp(search, 'i'); // 'i' for case-insensitive search
+      query.$or = [
+        { name: { $regex: searchRegex } },
+        { sku: { $regex: searchRegex } },
+      ];
+    }
     
     const products = await Product.find(query)
       .populate("category", "name")

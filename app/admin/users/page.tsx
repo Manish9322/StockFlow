@@ -63,7 +63,6 @@ function AdminUsersContent() {
   const { adminUser } = useAuth()
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
-  const [roleFilter, setRoleFilter] = useState("all")
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -78,7 +77,6 @@ function AdminUsersContent() {
     refetch: refetchUsers 
   } = useGetAllUsersQuery({ 
     status: statusFilter, 
-    role: roleFilter, 
     search: searchTerm 
   })
 
@@ -89,7 +87,6 @@ function AdminUsersContent() {
     name: "",
     email: "",
     company: "",
-    role: "user",
     status: "active",
   })
 
@@ -108,8 +105,6 @@ function AdminUsersContent() {
   // Calculate statistics
   const totalUsers = users.length
   const activeUsers = users.filter((u: User) => u.status === "active").length
-  const adminUsers = users.filter((u: User) => u.role === "admin").length
-  const regularUsers = users.filter((u: User) => u.role === "user").length
 
   const handleEditUser = (userToEdit: User) => {
     setSelectedUser(userToEdit)
@@ -117,7 +112,6 @@ function AdminUsersContent() {
       name: userToEdit.name || "",
       email: userToEdit.email || "",
       company: userToEdit.company || "",
-      role: userToEdit.role || "user",
       status: userToEdit.status || "active",
     })
     setShowEditModal(true)
@@ -134,7 +128,10 @@ function AdminUsersContent() {
     try {
       await updateUser({
         userId: selectedUser._id,
-        ...editForm,
+        name: editForm.name,
+        email: editForm.email,
+        company: editForm.company,
+        status: editForm.status,
       }).unwrap()
 
       toast.success("User updated successfully")
@@ -202,7 +199,7 @@ function AdminUsersContent() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
             <div className="bg-card border border-border rounded-lg p-4 md:p-6">
               <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Total Users</p>
               <p className="text-2xl md:text-2xl font-semibold text-foreground">{totalUsers}</p>
@@ -210,14 +207,6 @@ function AdminUsersContent() {
             <div className="bg-card border border-border rounded-lg p-4 md:p-6">
               <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Active Users</p>
               <p className="text-2xl md:text-2xl font-semibold text-foreground">{activeUsers}</p>
-            </div>
-            <div className="bg-card border border-border rounded-lg p-4 md:p-6">
-              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Admin Users</p>
-              <p className="text-2xl md:text-2xl font-semibold text-foreground">{adminUsers}</p>
-            </div>
-            <div className="bg-card border border-border rounded-lg p-4 md:p-6">
-              <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Regular Users</p>
-              <p className="text-2xl md:text-2xl font-semibold text-foreground">{regularUsers}</p>
             </div>
           </div>
         )}
@@ -235,8 +224,8 @@ function AdminUsersContent() {
               Refresh
             </Button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="md:col-span-2">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+            <div className="md:col-span-6">
               <label className="block text-sm font-medium text-foreground mb-2">Search Users</label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -248,7 +237,7 @@ function AdminUsersContent() {
                 />
               </div>
             </div>
-            <div>
+            <div className="md:col-span-6">
               <label className="block text-sm font-medium text-foreground mb-2">Status</label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger>
@@ -259,19 +248,6 @@ function AdminUsersContent() {
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="inactive">Inactive</SelectItem>
                   <SelectItem value="suspended">Suspended</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Role</label>
-              <Select value={roleFilter} onValueChange={setRoleFilter}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Roles</SelectItem>
-                  <SelectItem value="user">Users</SelectItem>
-                  <SelectItem value="admin">Admins</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -288,7 +264,6 @@ function AdminUsersContent() {
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Company</TableHead>
-                  <TableHead>Role</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Last Login</TableHead>
                   <TableHead>Created</TableHead>
@@ -298,7 +273,7 @@ function AdminUsersContent() {
               <TableBody>
                 {usersLoading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">
+                    <TableCell colSpan={7} className="text-center py-8">
                       <div className="flex items-center justify-center gap-2">
                         <RefreshCw className="w-4 h-4 animate-spin" />
                         Loading users...
@@ -307,7 +282,7 @@ function AdminUsersContent() {
                   </TableRow>
                 ) : paginatedUsers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No users found
                     </TableCell>
                   </TableRow>
@@ -322,7 +297,7 @@ function AdminUsersContent() {
                       </TableCell>
                       <TableCell>{userItem.email}</TableCell>
                       <TableCell>{userItem.company || "-"}</TableCell>
-                      <TableCell>{getRoleBadge(userItem.role)}</TableCell>
+
                       <TableCell>{getStatusBadge(userItem.status)}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {userItem.lastLogin
@@ -450,7 +425,7 @@ function AdminUsersContent() {
           <DialogHeader>
             <DialogTitle>Edit User</DialogTitle>
             <DialogDescription>
-              Update user information, role, and status
+              Update user information and status
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -479,18 +454,7 @@ function AdminUsersContent() {
                 onChange={(e) => setEditForm({ ...editForm, company: e.target.value })}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-role">Role</Label>
-              <Select value={editForm.role} onValueChange={(value) => setEditForm({ ...editForm, role: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="user">User</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+
             <div className="space-y-2">
               <Label htmlFor="edit-status">Status</Label>
               <Select value={editForm.status} onValueChange={(value) => setEditForm({ ...editForm, status: value })}>

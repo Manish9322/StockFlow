@@ -9,12 +9,29 @@ export async function GET(request) {
   try {
     await dbConnect();
 
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
+    const url = new URL(request.url);
+    const userId = url.searchParams.get("userId");
+    const search = url.searchParams.get("search");
 
-    // For regular users, fetch global tax config (admin-created)
-    // For admin, also fetch global config
-    let taxConfig = await TaxConfig.findOne({ isGlobal: true });
+    let taxConfig;
+    
+    // If search parameter is provided, return all tax configs that match the search
+    if (search) {
+      const searchRegex = new RegExp(search, 'i');
+      taxConfig = await TaxConfig.findOne({ 
+        isGlobal: true,
+        $or: [
+          { "gst.description": { $regex: searchRegex } },
+          { "platformFee.description": { $regex: searchRegex } },
+          { "otherTaxes.description": { $regex: searchRegex } },
+          { "otherTaxes.name": { $regex: searchRegex } },
+        ]
+      });
+    } else {
+      // For regular users, fetch global tax config (admin-created)
+      // For admin, also fetch global config
+      taxConfig = await TaxConfig.findOne({ isGlobal: true });
+    }
 
     // If no global config exists, create a default one
     if (!taxConfig) {

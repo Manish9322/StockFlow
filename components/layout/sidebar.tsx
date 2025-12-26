@@ -1,10 +1,11 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { LayoutDashboard, Plus, RefreshCw, BarChart3, Settings, ShoppingCart, History, Shield, Users, Package, FolderTree, Ruler, Activity } from "lucide-react"
+import { usePathname, useRouter } from "next/navigation"
+import { LayoutDashboard, Plus, RefreshCw, BarChart3, Settings, ShoppingCart, History, Shield, Users, Package, FolderTree, Ruler, Activity, LogOut } from "lucide-react"
 import { useLanguage } from "@/lib/language-context"
 import { useAuth } from "@/lib/auth-context"
+import { useState } from "react"
 
 interface SidebarProps {
   isOpen: boolean
@@ -13,12 +14,24 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, onNavigate }: SidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const { t } = useLanguage()
-  const { user, adminUser } = useAuth()
+  const { user, adminUser, adminLogout } = useAuth()
+  const [showLogoutModal, setShowLogoutModal] = useState(false)
 
   // Determine if we're on an admin route
   const isAdminRoute = pathname.startsWith("/admin")
   const isAdmin = adminUser?.role === "admin"
+
+  const handleAdminLogout = () => {
+    adminLogout()
+    router.push("/admin/login")
+  }
+
+  const confirmAdminLogout = () => {
+    handleAdminLogout()
+    setShowLogoutModal(false)
+  }
 
   // Admin navigation items
   const adminNavItems = [
@@ -83,9 +96,43 @@ export default function Sidebar({ isOpen, onNavigate }: SidebarProps) {
         })}
       </nav>
 
-      <div className="p-4 border-t border-border text-xs text-muted-foreground shrink-0 whitespace-nowrap">
+      {isAdminRoute && isAdmin && (
+        <div className="p-1.5 border-t border-border">
+          <button
+            onClick={() => setShowLogoutModal(true)}
+            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-md text-sm font-medium transition-colors text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <LogOut size={18} className="shrink-0" />
+            <span>Logout</span>
+          </button>
+        </div>
+      )}
+      <div className="p-4 border-t border-border text-xs text-muted-foreground shrink-nowrap">
         <p>© 2025 {sidebarTitle}</p>
       </div>
+
+      {showLogoutModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-9999">
+          <div className="bg-card border border-border rounded-lg p-6 max-w-sm mx-4">
+            <h2 className="text-lg font-semibold text-foreground mb-2">Confirm Logout</h2>
+            <p className="text-sm text-muted-foreground mb-6">Are you sure you want to logout from your account?</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLogoutModal(false)}
+                className="flex-1 px-4 py-2 rounded-md border border-border text-foreground hover:bg-muted transition-colors text-sm font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmAdminLogout}
+                className="flex-1 px-4 py-2 rounded-md bg-foreground text-background hover:bg-muted-foreground transition-colors text-sm font-medium"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   )
 }

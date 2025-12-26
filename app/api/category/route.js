@@ -12,7 +12,24 @@ export async function GET(request) {
     // Verify user is authenticated
     const { error, userId } = requireAuth(request);
     if (error) return error;
-    const categories = await Category.find({ isGlobal: true }).sort({ createdAt: -1 });
+    
+    // Get search query from URL parameters
+    const url = new URL(request.url);
+    const search = url.searchParams.get('search');
+    
+    // Build query for global categories
+    let query = { isGlobal: true };
+    
+    // Add search functionality if search parameter is provided
+    if (search) {
+      const searchRegex = new RegExp(search, 'i'); // 'i' for case-insensitive search
+      query.$or = [
+        { name: { $regex: searchRegex } },
+        { description: { $regex: searchRegex } },
+      ];
+    }
+    
+    const categories = await Category.find(query).sort({ createdAt: -1 });
     
     return NextResponse.json({
       success: true,

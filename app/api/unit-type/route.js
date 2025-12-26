@@ -13,9 +13,26 @@ export async function GET(request) {
     const { error, userId } = requireAuth(request);
     if (error) return error;
     
+    // Get search query from URL parameters
+    const url = new URL(request.url);
+    const search = url.searchParams.get('search');
+    
+    // Build query for global unit types
+    let query = { isGlobal: true };
+    
+    // Add search functionality if search parameter is provided
+    if (search) {
+      const searchRegex = new RegExp(search, 'i'); // 'i' for case-insensitive search
+      query.$or = [
+        { name: { $regex: searchRegex } },
+        { abbreviation: { $regex: searchRegex } },
+        { description: { $regex: searchRegex } },
+      ];
+    }
+    
     // Fetch global unit types (admin-created)
     // For now, we only fetch global unit types since all unit types are admin-managed
-    const unitTypes = await UnitType.find({ isGlobal: true }).sort({ createdAt: -1 });
+    const unitTypes = await UnitType.find(query).sort({ createdAt: -1 });
     
     return NextResponse.json({
       success: true,
