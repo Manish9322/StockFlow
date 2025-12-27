@@ -49,7 +49,6 @@ const userSchema = new mongoose.Schema(
 );
 
 // Index for better query performance
-userSchema.index({ email: 1 });
 userSchema.index({ status: 1 });
 
 // Hash password before saving
