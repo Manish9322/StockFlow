@@ -112,7 +112,7 @@ export default function Sidebar({ isOpen, onNavigate }: SidebarProps) {
       </div>
 
       {showLogoutModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-9999">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-card border border-border rounded-lg p-6 max-w-sm mx-4">
             <h2 className="text-lg font-semibold text-foreground mb-2">Confirm Logout</h2>
             <p className="text-sm text-muted-foreground mb-6">Are you sure you want to logout from your account?</p>
