@@ -414,7 +414,7 @@ function PurchasesContent() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-4 mb-4">
           <div className="bg-card border border-border rounded-lg px-5 py-3">
             <div className="flex items-start justify-between">
               <div className="space-y-1">

@@ -3,8 +3,9 @@
 import { use, useState } from "react"
 import MainLayout from "@/components/layout/main-layout"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import Link from "next/link"
-import { ChevronLeft, ChevronDown } from "lucide-react"
+import { ChevronLeft, ChevronDown, ChevronRight, X, Image as ImageIcon } from "lucide-react"
 import { useGetProductByIdQuery } from "@/lib/utils/services/api"
 
 export default function ProductDetail({ params }: { params: Promise<{ id: string }> }) {
@@ -12,6 +13,7 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
   const { data: productData, isLoading, error } = useGetProductByIdQuery(id)
   const product = productData?.data
   const [showHistory, setShowHistory] = useState(false)
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null)
 
   if (isLoading) {
     return (
@@ -86,6 +88,97 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
             <p className="text-xs text-muted-foreground mt-2">Per unit</p>
           </div>
         </div>
+
+        {/* Product Images Section - only show if images exist */}
+        {product.images && product.images.length > 0 && (
+          <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4">
+            <h2 className="font-semibold text-foreground text-sm md:text-base">Product Images</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {product.images.map((image: string, index: number) => (
+                <div key={index} className="aspect-square">
+                  <Card className="overflow-hidden h-full">
+                    <CardContent className="p-0 flex items-center justify-center h-full bg-muted">
+                      <img 
+                        src={image} 
+                        alt={`${product.name} - Image ${index + 1}`}
+                        className="w-full h-full object-contain cursor-pointer"
+                        onClick={() => setSelectedImageIndex(index)}
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.onerror = null;
+                          target.src = '/placeholder-image.jpg';
+                        }}
+                      />
+                    </CardContent>
+                  </Card>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Image Preview Modal */}
+        {product.images && product.images.length > 0 && selectedImageIndex !== null && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="relative w-full max-w-4xl max-h-[90vh] bg-background rounded-lg overflow-hidden">
+              <button
+                onClick={() => setSelectedImageIndex(null)}
+                className="absolute top-4 right-4 z-10 p-2 rounded-full bg-background/80 hover:bg-background text-foreground hover:text-foreground transition-colors"
+                aria-label="Close image preview"
+              >
+                <X size={20} />
+              </button>
+              
+              {/* Navigation buttons */}
+              {product.images.length > 1 && (
+                <>
+                  <button
+                    onClick={() => setSelectedImageIndex(prev => 
+                      prev !== null ? (prev > 0 ? prev - 1 : product.images.length - 1) : 0
+                    )}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-background/80 hover:bg-background text-foreground hover:text-foreground transition-colors"
+                    aria-label="Previous image"
+                  >
+                    <ChevronLeft size={24} />
+                  </button>
+                  <button
+                    onClick={() => setSelectedImageIndex(prev => 
+                      prev !== null ? (prev < product.images.length - 1 ? prev + 1 : 0) : 0
+                    )}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-background/80 hover:bg-background text-foreground hover:text-foreground transition-colors"
+                    aria-label="Next image"
+                  >
+                    <ChevronRight size={24} />
+                  </button>
+                </>
+              )}
+              
+              {/* Current image with navigation */}
+              <div className="flex flex-col h-full">
+                <div className="p-4 border-b border-border flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">
+                    {selectedImageIndex + 1} of {product.images.length}
+                  </span>
+                  <span className="text-sm font-medium truncate max-w-xs">
+                    {product.name} - Image {selectedImageIndex + 1}
+                  </span>
+                </div>
+                <div className="flex-1 flex items-center justify-center p-4 bg-muted">
+                  <img
+                    src={product.images[selectedImageIndex]}
+                    alt={`${product.name} - Image ${selectedImageIndex + 1}`}
+                    className="max-h-[70vh] max-w-full object-contain"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.onerror = null;
+                      target.src = '/placeholder-image.jpg';
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
           <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4">

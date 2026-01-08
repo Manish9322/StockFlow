@@ -4,7 +4,7 @@ import MainLayout from "@/components/layout/main-layout"
 import { ProtectedRoute } from "@/components/protected-route"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Download } from "lucide-react"
+import { Download, Calendar, Clock } from "lucide-react"
 import { useState, useMemo } from "react"
 import {
   BarChart,
@@ -61,12 +61,41 @@ interface Movement {
 
 function ReportsContent() {
   const [timePeriod, setTimePeriod] = useState("30days")
+  const [customStartDate, setCustomStartDate] = useState("")
+  const [customEndDate, setCustomEndDate] = useState("")
   
   const { data: productsData, isLoading: productsLoading } = useGetProductsQuery({})
   const { data: movementsData, isLoading: movementsLoading } = useGetMovementsQuery({})
   
   const products: Product[] = productsData?.data || []
   const movements: Movement[] = movementsData?.data || []
+
+  // Filter movements based on selected time period
+  const filteredMovements = useMemo(() => {
+    if (timePeriod === "custom" && customStartDate && customEndDate) {
+      const startDate = new Date(customStartDate)
+      const endDate = new Date(customEndDate)
+      endDate.setHours(23, 59, 59, 999) // Include the entire end day
+      
+      return movements.filter((m) => {
+        const movementDate = new Date(m.timestamp)
+        return movementDate >= startDate && movementDate <= endDate
+      })
+    }
+    
+    const daysMap = {
+      "7days": 7,
+      "30days": 30,
+      "90days": 90,
+      custom: 30,
+    }
+    
+    const days = daysMap[timePeriod as keyof typeof daysMap] || 30
+    const cutoffDate = new Date()
+    cutoffDate.setDate(cutoffDate.getDate() - days)
+    
+    return movements.filter((m) => new Date(m.timestamp) >= cutoffDate)
+  }, [movements, timePeriod, customStartDate, customEndDate])
 
   const lowStockProducts = useMemo(() => {
     return products.filter((p) => p.quantity < p.minStockAlert)
@@ -78,6 +107,21 @@ function ReportsContent() {
 
   const totalProducts = products.length
 
+  // Calculate movement statistics for the selected period
+  const movementStats = useMemo(() => {
+    const totalMovements = filteredMovements.length
+    const stockIn = filteredMovements
+      .filter((m) => (m.quantityChange || 0) > 0)
+      .reduce((sum, m) => sum + (m.quantityChange || 0), 0)
+    const stockOut = Math.abs(
+      filteredMovements
+        .filter((m) => (m.quantityChange || 0) < 0)
+        .reduce((sum, m) => sum + (m.quantityChange || 0), 0)
+    )
+    
+    return { totalMovements, stockIn, stockOut }
+  }, [filteredMovements])
+
   const getChartData = () => {
     const now = new Date()
     const getDateRange = (days: number) => {
@@ -87,33 +131,38 @@ function ReportsContent() {
       return { startDate, endDate }
     }
 
-    const daysMap = {
-      "7days": 7,
-      "30days": 30,
-      "90days": 90,
-      custom: 30,
+    let startDate: Date
+    let endDate: Date
+    let days: number
+
+    if (timePeriod === "custom" && customStartDate && customEndDate) {
+      startDate = new Date(customStartDate)
+      endDate = new Date(customEndDate)
+      days = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+    } else {
+      const daysMap = {
+        "7days": 7,
+        "30days": 30,
+        "90days": 90,
+        custom: 30,
+      }
+      days = daysMap[timePeriod as keyof typeof daysMap] || 30
+      const dateRange = getDateRange(days)
+      startDate = dateRange.startDate
+      endDate = dateRange.endDate
     }
 
-    const days = daysMap[timePeriod as keyof typeof daysMap] || 30
-    const { startDate, endDate } = getDateRange(days)
-
-    // Filter movements within the date range
-    const filteredMovements = movements.filter((m) => {
-      const movementDate = new Date(m.timestamp)
-      return movementDate >= startDate && movementDate <= endDate
-    })
-
-    // Group movements by date and calculate cumulative stock
+    // Get current total stock
     const currentStock = products.reduce((sum, p) => sum + p.quantity, 0)
 
-    // Sort movements by date
-    const sortedMovements = [...filteredMovements].sort(
+    // Sort all movements by date (oldest first)
+    const sortedMovements = [...movements].sort(
       (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     )
 
-    // Calculate stock at different points
+    // Calculate stock at different points in time
     const dataPoints: { date: string; stock: number }[] = []
-    const pointCount = days <= 7 ? days : days <= 30 ? 5 : 5
+    const pointCount = days <= 7 ? days : days <= 30 ? 8 : 10
     const interval = Math.floor(days / pointCount)
 
     for (let i = 0; i <= pointCount; i++) {
@@ -122,13 +171,13 @@ function ReportsContent() {
       
       const dateStr = pointDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })
       
-      // Calculate stock up to this point (reverse calculation from current stock)
-      const movementsAfterPoint = movements.filter((m) => new Date(m.timestamp) > pointDate)
+      // Calculate stock at this point by working backwards from current stock
+      const movementsAfterPoint = sortedMovements.filter((m) => new Date(m.timestamp) > pointDate)
       const stockAtPoint = currentStock - movementsAfterPoint.reduce((sum, m) => {
         return sum + (m.quantityChange || 0)
       }, 0)
       
-      dataPoints.push({ date: dateStr, stock: Math.max(0, stockAtPoint) })
+      dataPoints.push({ date: dateStr, stock: Math.max(0, Math.round(stockAtPoint)) })
     }
 
     return dataPoints.length > 0 ? dataPoints : [{ date: "Today", stock: currentStock }]
@@ -147,29 +196,46 @@ function ReportsContent() {
       })
     })
 
-    return Array.from(categoryMap.entries()).map(([category, data]) => ({
-      category,
-      value: data.value,
-      count: data.count,
-    }))
+    return Array.from(categoryMap.entries())
+      .map(([category, data]) => ({
+        category,
+        value: Math.round(data.value),
+        count: data.count,
+      }))
+      .sort((a, b) => b.value - a.value) // Sort by value descending
   }, [products])
 
   // Data for Radar Chart (Product Performance)
   const radarData = useMemo(() => {
-    return products.slice(0, 6).map((p) => ({
-      name: p.name.split(" ")[0],
-      stock: Math.min((p.quantity / (p.minStockAlert * 5)) * 100, 100),
-      margin: ((p.sellingPrice - p.costPrice) / p.sellingPrice) * 100,
-      velocity: Math.random() * 100, // This would need actual sales data
-    }))
-  }, [products])
+    return products.slice(0, 6).map((p) => {
+      // Calculate velocity based on movements in the selected time period
+      const productMovements = filteredMovements.filter((m) => m.productId === p._id)
+      const totalMovement = Math.abs(
+        productMovements.reduce((sum, m) => sum + Math.abs(m.quantityChange || 0), 0)
+      )
+      // Normalize velocity to 0-100 scale (assuming max 100 units moved is 100%)
+      const velocity = Math.min((totalMovement / 100) * 100, 100)
+      
+      return {
+        name: p.name.split(" ")[0],
+        stock: Math.min((p.quantity / (p.minStockAlert * 5)) * 100, 100),
+        margin: ((p.sellingPrice - p.costPrice) / p.sellingPrice) * 100,
+        velocity: Math.round(velocity),
+      }
+    })
+  }, [products, filteredMovements])
 
   // Data for Composed Chart (Stock vs Revenue Potential)
   const composedData = useMemo(() => {
-    return products.slice(0, 10).map((p) => ({
-      name: p.name.split(" ")[0],
+    // Sort products by stock value to show top performers
+    const sortedProducts = [...products]
+      .sort((a, b) => (b.quantity * b.sellingPrice) - (a.quantity * a.sellingPrice))
+      .slice(0, 10)
+    
+    return sortedProducts.map((p) => ({
+      name: p.name.length > 15 ? p.name.substring(0, 15) + '...' : p.name,
       stock: p.quantity,
-      revenue: p.quantity * p.sellingPrice,
+      revenue: Math.round(p.quantity * p.sellingPrice),
     }))
   }, [products])
 
@@ -204,51 +270,150 @@ function ReportsContent() {
           </p>
         </div>
 
-        <div className="mb-6 p-4 bg-card border border-border rounded-lg">
-          <p className="text-sm font-medium text-foreground mb-3">Time Period</p>
-          <div className="flex flex-wrap gap-2">
-            {[
-              { value: "7days", label: "Last 7 Days" },
-              { value: "30days", label: "Last 30 Days" },
-              { value: "90days", label: "Last 90 Days" },
-              { value: "custom", label: "Custom Range" },
-            ].map((period) => (
-              <button
-                key={period.value}
-                onClick={() => setTimePeriod(period.value)}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  timePeriod === period.value
-                    ? "bg-foreground text-background"
-                    : "bg-muted text-foreground border border-border hover:bg-muted/80"
-                }`}
-              >
-                {period.label}
-              </button>
-            ))}
+        <div className="mb-4 bg-card border border-border rounded-xl overflow-hidden">
+          <div className="bg-card to-muted/30 px-6 py-4 border-b border-border">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-foreground" />
+              <div>
+                <h3 className="text-base font-semibold text-foreground">Time Period</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Select reporting timeframe</p>
+              </div>
+            </div>
           </div>
+          <div className="p-6">
+            <div className="flex flex-wrap gap-3">
+              {[
+                { value: "7days", label: "Last 7 Days", desc: "1 week" },
+                { value: "30days", label: "Last 30 Days", desc: "1 month" },
+                { value: "90days", label: "Last 90 Days", desc: "3 months" },
+                { value: "custom", label: "Custom Range", desc: "Select dates" },
+              ].map((period) => (
+                <button
+                  key={period.value}
+                  onClick={() => setTimePeriod(period.value)}
+                  className={`group relative flex-1 min-w-[140px] px-5 py-3.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    timePeriod === period.value
+                      ? "bg-foreground text-background scale-[1.02]"
+                      : "bg-muted/50 text-foreground border border-border hover:border-foreground/40"
+                  }`}
+                >
+                  <div className="flex flex-col items-start w-full">
+                    <div className="flex items-center gap-2 w-full">
+                      <Clock className={`w-3.5 h-3.5 ${timePeriod === period.value ? 'opacity-100' : 'opacity-60'}`} />
+                      <span className="font-semibold">{period.label}</span>
+                    </div>
+                    <span className={`text-xs mt-1 ${timePeriod === period.value ? 'opacity-90' : 'opacity-60'}`}>
+                      {period.desc}
+                    </span>
+                  </div>
+                  {timePeriod === period.value && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-background/30"></div>
+                  )}
+                </button>
+              ))}
+            </div>            
+            {/* Custom Date Range Picker */}
+            {timePeriod === "custom" && (
+              <div className="mt-6 pt-6 border-t border-border">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex-1">
+                    <label className="block text-xs font-semibold text-muted-foreground mb-2 uppercase">
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      value={customStartDate}
+                      onChange={(e) => setCustomStartDate(e.target.value)}
+                      max={customEndDate || new Date().toISOString().split('T')[0]}
+                      className="w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 transition-all"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs font-semibold text-muted-foreground mb-2 uppercase">
+                      End Date
+                    </label>
+                    <input
+                      type="date"
+                      value={customEndDate}
+                      onChange={(e) => setCustomEndDate(e.target.value)}
+                      min={customStartDate}
+                      max={new Date().toISOString().split('T')[0]}
+                      className="w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 transition-all"
+                    />
+                  </div>
+                </div>
+                {customStartDate && customEndDate && (
+                  <div className="mt-4 px-4 py-3 bg-muted/50 rounded-lg border border-border">
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-semibold">Selected Range:</span>{" "}
+                      {new Date(customStartDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      {" "}-{" "}
+                      {new Date(customEndDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      {" "}({Math.ceil((new Date(customEndDate).getTime() - new Date(customStartDate).getTime()) / (1000 * 60 * 60 * 24)) + 1} days)
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}          </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           {[
-            { label: "Total Products", value: totalProducts },
-            { label: "Low Stock Items", value: lowStockProducts.length },
+            { label: "Total Products", value: totalProducts, tooltip: "Total number of products in inventory" },
+            { label: "Low Stock Items", value: lowStockProducts.length, tooltip: "Products below minimum stock alert" },
             {
               label: "Inventory Value",
-              value: `₹${totalInventoryValue.toLocaleString()}`,
+              value: `₹${Math.round(totalInventoryValue).toLocaleString()}`,
+              tooltip: "Total value of all inventory at cost price"
             },
             {
-              label: "Avg Stock Level",
-              value: totalProducts > 0 ? Math.round(products.reduce((sum, p) => sum + p.quantity, 0) / totalProducts) : 0,
+              label: "Total Movements",
+              value: movementStats.totalMovements,
+              tooltip: `Stock movements in selected period`
             },
           ].map((stat, idx) => (
-            <div key={idx} className="bg-card border border-border rounded-lg p-4 md:p-6">
+            <div key={idx} className="bg-card border border-border rounded-lg p-4 md:p-6" title={stat.tooltip}>
               <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">{stat.label}</p>
               <p className="text-xl md:text-2xl font-bold text-foreground">{stat.value}</p>
             </div>
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Additional Movement Stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+          <div 
+            className="bg-card border border-border rounded-lg p-4 md:p-6" 
+            title="Total units added to inventory in selected period"
+          >
+            <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Stock In</p>
+            <p className="text-xl md:text-2xl font-bold text-green-600">
+              +{movementStats.stockIn.toLocaleString()}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">units added</p>
+          </div>
+          <div 
+            className="bg-card border border-border rounded-lg p-4 md:p-6"
+            title="Total units removed from inventory in selected period"
+          >
+            <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Stock Out</p>
+            <p className="text-xl md:text-2xl font-bold text-red-600">
+              -{movementStats.stockOut.toLocaleString()}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">units removed</p>
+          </div>
+          <div 
+            className="bg-card border border-border rounded-lg p-4 md:p-6"
+            title="Net stock change (in - out) for selected period"
+          >
+            <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Net Change</p>
+            <p className={`text-xl md:text-2xl font-bold ${(movementStats.stockIn - movementStats.stockOut) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {(movementStats.stockIn - movementStats.stockOut) >= 0 ? '+' : ''}{(movementStats.stockIn - movementStats.stockOut).toLocaleString()}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">net units</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
           {/* Line Chart: Stock Trends */}
           <div className="bg-card border border-border rounded-lg p-6">
             <h2 className="text-lg font-semibold text-foreground mb-4">Stock Levels Trend</h2>
@@ -328,7 +493,7 @@ function ReportsContent() {
         </div>
 
         <div className="space-y-6">
-          <div className="bg-card border border-border rounded-lg p-6">
+          <div className="bg-card border border-border rounded-lg p-6 mb-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
               <h2 className="text-lg font-semibold text-foreground">Low Stock Products</h2>
               <Button variant="outline" className="flex items-center gap-2 bg-transparent">

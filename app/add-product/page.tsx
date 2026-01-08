@@ -17,6 +17,7 @@ import { generateSKU } from "@/lib/sku-generator"
 import { logEvent } from "@/lib/event-logger"
 import { useGetCategoriesQuery, useAddCategoryMutation, useGetUnitTypesQuery, useAddUnitTypeMutation, useAddProductMutation } from "@/lib/utils/services/api"
 import { toast } from "sonner"
+import { uploadMultipleImages } from "@/lib/utils/upload"
 
 function AddProductContent() {
   const router = useRouter()
@@ -95,6 +96,22 @@ function AddProductContent() {
     e.preventDefault()
     
     try {
+      let imageUrls: string[] = [];
+      
+      // Upload images to Cloudinary if there are any
+      if (images.length > 0) {
+        toast.loading("Uploading images...");
+        try {
+          imageUrls = await uploadMultipleImages(images);
+          toast.dismiss(); // Dismiss the loading toast
+        } catch (error) {
+          toast.dismiss(); // Dismiss the loading toast
+          toast.error("Failed to upload images");
+          console.error("Error uploading images:", error);
+          return; // Don't proceed if image upload fails
+        }
+      }
+      
       const productData = {
         name: formData.name,
         sku: formData.sku,
@@ -111,7 +128,7 @@ function AddProductContent() {
         purchaseDate: formData.purchaseDate,
         expiryDate: formData.expiryDate,
         minStockAlert: formData.minStockAlert,
-        images: [], // TODO: Implement image upload
+        images: imageUrls, // Use the uploaded image URLs
       }
       
       await addProduct(productData).unwrap()

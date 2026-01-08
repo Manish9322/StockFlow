@@ -1,6 +1,6 @@
 "use client"
 
-import { Menu, Bell, User, LogOut, Search } from "lucide-react"
+import { Menu, Bell, LogOut, Search } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter, usePathname } from "next/navigation"
 import { useState, useEffect, useRef, useCallback } from "react"
@@ -22,7 +22,6 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
   const { user, adminUser, logout, adminLogout } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
-  const [showDropdown, setShowDropdown] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState<any[]>([])
   
@@ -173,9 +172,10 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
       logout()
       router.push("/login")
     }
-    setShowDropdown(false)
     setShowLogoutModal(false)
   }
+
+
 
   const handleSearchResultClick = (entityType: string, entityId: string) => {
     let path = '';
@@ -209,11 +209,11 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
 
   return (
     <>
-      <header className="h-16 bg-background border-b border-border flex items-center justify-between px-4 md:px-6 flex-shrink-0">
+      <header className="h-16 bg-background border-b border-border flex items-center justify-between px-4 md:px-6">
         <div className="flex items-center gap-2 md:gap-4 min-w-0">
           <button
             onClick={onMenuClick}
-            className="p-2 hover:bg-muted rounded-md transition-colors flex-shrink-0"
+            className="p-2 hover:bg-muted rounded-md transition-colors"
             aria-label="Toggle sidebar"
           >
             <Menu size={20} className="text-foreground" />
@@ -226,7 +226,7 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
             <div className="relative">
               <Search
                 size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground flex-shrink-0"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground "
               />
               <input
                 type="text"
@@ -279,32 +279,14 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
             <Bell size={20} className="text-foreground" />
             <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full"></span>
           </button>
-          {!isAdminRoute && (
-            <div className="relative">
-              <button
-                onClick={() => setShowDropdown(!showDropdown)}
-                className="p-2 hover:bg-muted rounded-md transition-colors"
-                aria-label="User menu"
-              >
-                <User size={20} className="text-foreground" />
-              </button>
-
-              {showDropdown && currentUser && (
-                <div className="absolute right-0 mt-2 w-48 bg-card border border-border rounded-lg shadow-lg z-50">
-                  <div className="p-3 border-b border-border">
-                    <p className="text-sm font-medium text-foreground">{currentUser.name}</p>
-                    <p className="text-xs text-muted-foreground">{currentUser.email}</p>
-                  </div>
-                  <button
-                    onClick={handleLogout}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted rounded-md transition-colors"
-                  >
-                    <LogOut size={16} />
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
+          {(isAdminRoute || (!isAdminRoute && user)) && (
+            <button
+              onClick={handleLogout}
+              className="p-2 hover:bg-muted rounded-md transition-colors"
+              aria-label="Logout"
+            >
+              <LogOut size={20} className="text-foreground" />
+            </button>
           )}
         </div>
       </header>

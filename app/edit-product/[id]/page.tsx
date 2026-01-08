@@ -14,6 +14,7 @@ import { ChevronLeft, Upload, X } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { logMovement } from "@/lib/movement-logger"
 import { useAuth } from "@/lib/auth-context"
+import { uploadMultipleImages } from "@/lib/utils/upload"
 
 export default function EditProduct({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -48,6 +49,8 @@ export default function EditProduct({ params }: { params: Promise<{ id: string }
   })
 
   const [images, setImages] = useState<File[]>([])
+  const [existingImages, setExistingImages] = useState<string[]>([])
+  const [imagesToRemove, setImagesToRemove] = useState<string[]>([])
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -77,6 +80,9 @@ export default function EditProduct({ params }: { params: Promise<{ id: string }
         minStockAlert: product.minStockAlert?.toString() || "10",
         status: product.status || "active",
       })
+      
+      // Set existing images
+      setExistingImages(product.images || [])
     }
   }, [product])
 
@@ -92,6 +98,25 @@ export default function EditProduct({ params }: { params: Promise<{ id: string }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
+    // Validate required fields
+    if (!formData.category) {
+      toast({
+        title: "Error",
+        description: "Please select a category",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!formData.unitType) {
+      toast({
+        title: "Error",
+        description: "Please select a unit type",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
       // Store original values for change tracking
       const originalData = {
@@ -104,6 +129,29 @@ export default function EditProduct({ params }: { params: Promise<{ id: string }
         minStockAlert: product.minStockAlert,
         status: product.status,
       }
+      
+      let imageUrls: string[] = [];
+      
+      // Upload images to Cloudinary if there are any
+      if (images.length > 0) {
+        try {
+          imageUrls = await uploadMultipleImages(images);
+        } catch (error) {
+          toast({
+            title: "Error",
+            description: "Failed to upload images",
+            variant: "destructive",
+          });
+          console.error("Error uploading images:", error);
+          return; // Don't proceed if image upload fails
+        }
+      }
+      
+      // Filter out images that are marked for removal
+      const filteredExistingImages = existingImages.filter(img => !imagesToRemove.includes(img));
+      
+      // Combine remaining existing images with newly uploaded images
+      const allImages = [...filteredExistingImages, ...imageUrls];
       
       const updatedData = await updateProduct({
         id,
@@ -121,6 +169,7 @@ export default function EditProduct({ params }: { params: Promise<{ id: string }
         supplierRegistrationNumber: formData.supplierRegistrationNumber,
         minStockAlert: parseInt(formData.minStockAlert),
         status: formData.status,
+        images: allImages, // Include both existing and new images
       }).unwrap()
       
       // Log movement for product update
@@ -133,6 +182,7 @@ export default function EditProduct({ params }: { params: Promise<{ id: string }
       if (originalData.supplier !== formData.supplier) changedFields.push('supplier')
       if (originalData.minStockAlert !== parseInt(formData.minStockAlert)) changedFields.push('min stock alert')
       if (originalData.status !== formData.status) changedFields.push('status')
+      if (imageUrls.length > 0) changedFields.push('images')
       
       if (changedFields.length > 0) {
         await logMovement({
@@ -388,24 +438,63 @@ export default function EditProduct({ params }: { params: Promise<{ id: string }
             <div className="border-t border-border pt-6">
               <h2 className="text-lg font-semibold text-foreground mb-4">Product Images</h2>
               
+              {/* Existing Images */}
+              {existingImages.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-sm font-medium text-foreground mb-3">Current Images</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {existingImages.map((image, index) => (
+                      <div key={`existing-${index}`} className="relative group">
+                        <img
+                          src={image}
+                          alt={`Existing image ${index + 1}`}
+                          className="w-full h-32 object-cover rounded-lg border border-border"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.onerror = null;
+                            target.src = '/placeholder-image.jpg';
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // Mark image for removal
+                            setImagesToRemove(prev => [...prev, image]);
+                            // Remove from existing images
+                            setExistingImages(prev => prev.filter((_, i) => i !== index));
+                          }}
+                          className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* New Images to Upload */}
               {images.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                  {images.map((image, index) => (
-                    <div key={index} className="relative group">
-                      <img
-                        src={URL.createObjectURL(image)}
-                        alt={`Preview ${index + 1}`}
-                        className="w-full h-32 object-cover rounded-lg border border-border"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeImage(index)}
-                        className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  ))}
+                <div className="mb-6">
+                  <h3 className="text-sm font-medium text-foreground mb-3">New Images to Add</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {images.map((image, index) => (
+                      <div key={`new-${index}`} className="relative group">
+                        <img
+                          src={URL.createObjectURL(image)}
+                          alt={`New image ${index + 1}`}
+                          className="w-full h-32 object-cover rounded-lg border border-border"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeImage(index)}
+                          className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
               

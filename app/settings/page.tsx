@@ -849,7 +849,7 @@ function SettingsContent() {
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
           {/* Sidebar Navigation */}
           <div className="lg:col-span-1">
             <div className="bg-card border border-border rounded-lg p-4 space-y-1 sticky top-20 h-fit">

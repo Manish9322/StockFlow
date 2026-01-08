@@ -95,7 +95,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
     }
-    setLoading(false)
+    
+    // Verify user session against server
+    const verifySession = async () => {
+      const storedToken = localStorage.getItem("token");
+      if (storedToken) {
+        try {
+          const response = await fetch("/api/auth/me", {
+            headers: {
+              "Authorization": `Bearer ${storedToken}`,
+            },
+          });
+          
+          if (!response.ok) {
+            // Token is invalid, clear local storage
+            localStorage.removeItem("user");
+            localStorage.removeItem("token");
+            setUser(null);
+            setToken(null);
+          } else {
+            const result = await response.json();
+            if (result.success && result.data) {
+              const userData = {
+                id: result.data._id,
+                email: result.data.email,
+                name: result.data.name,
+                company: result.data.company,
+                role: result.data.role,
+                status: result.data.status,
+              };
+              setUser(userData);
+              setToken(storedToken);
+              localStorage.setItem("user", JSON.stringify(userData));
+            }
+          }
+        } catch (error) {
+          console.error("Session verification failed:", error);
+          localStorage.removeItem("user");
+          localStorage.removeItem("token");
+          setUser(null);
+          setToken(null);
+        }
+      }
+      
+      const storedAdminToken = localStorage.getItem("adminToken");
+      if (storedAdminToken) {
+        // For admin, we'll rely on the static credentials, so no server verification needed
+      }
+      
+      setLoading(false);
+    };
+    
+    verifySession();
   }, [])
 
   const login = async (email: string, password: string) => {

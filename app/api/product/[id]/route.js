@@ -88,6 +88,27 @@ export async function PUT(request, { params }) {
       }
     }
     
+    // Validate required fields
+    if (!body.category) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Category is required",
+        },
+        { status: 400 }
+      );
+    }
+    
+    if (!body.unitType) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Unit type is required",
+        },
+        { status: 400 }
+      );
+    }
+    
     // Store old values for change tracking
     const oldProduct = {
       name: existingProduct.name,
