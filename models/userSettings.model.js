@@ -11,7 +11,6 @@ const userSettingsSchema = new mongoose.Schema(
     profile: {
       name: String,
       email: String,
-      company: String,
     },
     preferences: {
       lowStockThreshold: {
@@ -25,18 +24,6 @@ const userSettingsSchema = new mongoose.Schema(
       timezone: {
         type: String,
         default: "UTC",
-      },
-      darkMode: {
-        type: Boolean,
-        default: false,
-      },
-      emailNotifications: {
-        type: Boolean,
-        default: true,
-      },
-      weeklyReports: {
-        type: Boolean,
-        default: true,
       },
     },
   },

@@ -333,9 +333,95 @@ function DashboardContent() {
           <div className="overflow-x-auto -mx-4 md:mx-0">
             <div className="inline-block min-w-full px-4 md:px-0">
               {isLoading ? (
-                <div className="space-y-3">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <div key={i} className="h-12 bg-muted rounded animate-pulse"></div>
+                <div className="space-y-4">
+                  {/* Table Header Skeleton */}
+                  <div className="grid grid-cols-7 gap-4 pb-3 border-b border-border">
+                    <div className="h-4 bg-linear-to-r from-muted via-muted/60 to-muted rounded animate-pulse"></div>
+                    <div className="h-4 bg-linear-to-r from-muted via-muted/60 to-muted rounded animate-pulse"></div>
+                    <div className="h-4 bg-linear-to-r from-muted via-muted/60 to-muted rounded animate-pulse"></div>
+                    <div className="h-4 bg-linear-to-r from-muted via-muted/60 to-muted rounded animate-pulse hidden sm:block"></div>
+                    <div className="h-4 bg-linear-to-r from-muted via-muted/60 to-muted rounded animate-pulse hidden lg:block"></div>
+                    <div className="h-4 bg-linear-to-r from-muted via-muted/60 to-muted rounded animate-pulse"></div>
+                    <div className="h-4 bg-linear-to-r from-muted via-muted/60 to-muted rounded animate-pulse"></div>
+                  </div>
+                  
+                  {/* Table Rows Skeleton */}
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                    <div key={i} className="grid grid-cols-7 gap-4 py-4 border-b border-border/50 items-center">
+                      {/* Product Name - longer skeleton */}
+                      <div className="space-y-2">
+                        <div 
+                          className="h-4 bg-linear-to-r from-muted via-muted/60 to-muted rounded animate-pulse"
+                          style={{
+                            width: `${60 + Math.random() * 40}%`,
+                            animationDelay: `${i * 0.1}s`
+                          }}
+                        ></div>
+                      </div>
+                      
+                      {/* SKU */}
+                      <div className="space-y-2">
+                        <div 
+                          className="h-3 bg-linear-to-r from-muted via-muted/60 to-muted rounded animate-pulse"
+                          style={{
+                            width: `${50 + Math.random() * 30}%`,
+                            animationDelay: `${i * 0.1 + 0.05}s`
+                          }}
+                        ></div>
+                      </div>
+                      
+                      {/* Quantity */}
+                      <div className="space-y-2 flex justify-end">
+                        <div 
+                          className="h-3 bg-linear-to-r from-muted via-muted/60 to-muted rounded animate-pulse w-12"
+                          style={{
+                            animationDelay: `${i * 0.1 + 0.1}s`
+                          }}
+                        ></div>
+                      </div>
+                      
+                      {/* Category */}
+                      <div className="space-y-2 hidden sm:block">
+                        <div 
+                          className="h-3 bg-linear-to-r from-muted via-muted/60 to-muted rounded animate-pulse"
+                          style={{
+                            width: `${40 + Math.random() * 30}%`,
+                            animationDelay: `${i * 0.1 + 0.15}s`
+                          }}
+                        ></div>
+                      </div>
+                      
+                      {/* Updated Date */}
+                      <div className="space-y-2 hidden lg:block">
+                        <div 
+                          className="h-3 bg-linear-to-r from-muted via-muted/60 to-muted rounded animate-pulse"
+                          style={{
+                            width: `${60 + Math.random() * 20}%`,
+                            animationDelay: `${i * 0.1 + 0.2}s`
+                          }}
+                        ></div>
+                      </div>
+                      
+                      {/* Status Badge */}
+                      <div className="space-y-2">
+                        <div 
+                          className="h-6 w-20 bg-linear-to-r from-muted via-muted/60 to-muted rounded-full animate-pulse"
+                          style={{
+                            animationDelay: `${i * 0.1 + 0.25}s`
+                          }}
+                        ></div>
+                      </div>
+                      
+                      {/* Action Button */}
+                      <div className="space-y-2">
+                        <div 
+                          className="h-4 w-12 bg-linear-to-r from-muted via-muted/60 to-muted rounded animate-pulse"
+                          style={{
+                            animationDelay: `${i * 0.1 + 0.3}s`
+                          }}
+                        ></div>
+                      </div>
+                    </div>
                   ))}
                 </div>
               ) : error ? (

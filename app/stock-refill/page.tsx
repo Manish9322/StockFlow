@@ -136,7 +136,10 @@ export default function StockRefill() {
           "Authorization": `Bearer ${localStorage.getItem('token')}`,
         },
         body: JSON.stringify({
+          ...selectedProduct,
           quantity: updatedQuantity,
+          category: selectedProduct.category._id || selectedProduct.category,
+          unitType: selectedProduct.unitType._id || selectedProduct.unitType,
         }),
       })
 

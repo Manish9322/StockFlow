@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import _db from "@/lib/utils/db";
 import Product from "@/models/product.model";
 import Movement from "@/models/movement.model";
+import PriceHistory from "@/models/priceHistory.model";
+import User from "@/models/user.model";
 import { requireAuth } from "@/lib/auth-helpers";
 
 // GET - Fetch single product by ID
@@ -138,16 +140,27 @@ export async function PUT(request, { params }) {
     if (oldProduct.costPrice !== updatedProduct.costPrice) changes.push(`cost price: $${oldProduct.costPrice} → $${updatedProduct.costPrice}`);
     if (oldProduct.sellingPrice !== updatedProduct.sellingPrice) changes.push(`selling price: $${oldProduct.sellingPrice} → $${updatedProduct.sellingPrice}`);
     
+    // Fetch user information for logging
+    let userInfo = { name: "User", email: "" };
+    try {
+      const user = await User.findById(userId);
+      if (user) {
+        userInfo = { name: user.name, email: user.email };
+      }
+    } catch (err) {
+      console.error("Error fetching user:", err);
+    }
+
     // Log movement
     try {
       const changeDescription = changes.length > 0 ? ` (${changes.join(", ")})` : "";
-      await Movement.create({
+      const movementData = {
         eventType: "product.updated",
         eventTitle: "Product Updated",
         description: `Updated product: ${updatedProduct.name}${changeDescription}`,
         userId: userId,
-        userName: body.userName || "User",
-        userEmail: body.userEmail,
+        userName: userInfo.name,
+        userEmail: userInfo.email,
         relatedProduct: updatedProduct._id,
         metadata: {
           sku: updatedProduct.sku,
@@ -163,9 +176,47 @@ export async function PUT(request, { params }) {
             sellingPrice: updatedProduct.sellingPrice,
           },
         },
-      });
+      };
+      
+      console.log("Creating movement with data:", JSON.stringify(movementData, null, 2));
+      const movement = await Movement.create(movementData);
+      console.log("Movement created successfully:", movement._id);
+
+      // Log price changes to PriceHistory
+      if (oldProduct.costPrice !== updatedProduct.costPrice) {
+        await PriceHistory.create({
+          productId: updatedProduct._id,
+          userId: userId,
+          priceType: "costPrice",
+          oldPrice: oldProduct.costPrice,
+          newPrice: updatedProduct.costPrice,
+          reason: body.priceChangeReason || "Product update",
+          changedBy: {
+            userId: userId,
+            userName: userInfo.name,
+            userEmail: userInfo.email,
+          },
+        });
+      }
+
+      if (oldProduct.sellingPrice !== updatedProduct.sellingPrice) {
+        await PriceHistory.create({
+          productId: updatedProduct._id,
+          userId: userId,
+          priceType: "sellingPrice",
+          oldPrice: oldProduct.sellingPrice,
+          newPrice: updatedProduct.sellingPrice,
+          reason: body.priceChangeReason || "Product update",
+          changedBy: {
+            userId: userId,
+            userName: userInfo.name,
+            userEmail: userInfo.email,
+          },
+        });
+      }
     } catch (logError) {
       console.error("Error logging movement:", logError);
+      console.error("Error details:", logError.message, logError.stack);
       // Don't fail the request if logging fails
     }
     

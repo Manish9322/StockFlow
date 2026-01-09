@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
-import { useGetCategoriesQuery, useAddCategoryMutation, useUpdateCategoryMutation, useDeleteCategoryMutation, useGetUnitTypesQuery, useAddUnitTypeMutation, useUpdateUnitTypeMutation, useDeleteUnitTypeMutation, useGetUserSettingsQuery, useUpdateUserSettingsMutation, useGetCurrencyRatesQuery, useGetTaxConfigQuery, useUpdateTaxConfigMutation } from "@/lib/utils/services/api"
+import { useGetCategoriesQuery, useAddCategoryMutation, useUpdateCategoryMutation, useDeleteCategoryMutation, useGetUnitTypesQuery, useAddUnitTypeMutation, useUpdateUnitTypeMutation, useDeleteUnitTypeMutation, useGetUserSettingsQuery, useUpdateUserSettingsMutation, useGetCurrencyRatesQuery, useGetTaxConfigQuery, useUpdateTaxConfigMutation, useChangePasswordMutation } from "@/lib/utils/services/api"
 import { toast } from "sonner"
-import { Eye, Pencil, Trash2, Plus, Loader2, RefreshCw } from "lucide-react"
+import { Eye, EyeOff, Pencil, Trash2, Plus, Loader2, RefreshCw } from "lucide-react"
 import { logMovement } from "@/lib/movement-logger"
 import { CURRENCIES, formatCurrency } from "@/lib/utils/currency"
 import { TIMEZONES, getUserTimezone, formatDateWithTimezone } from "@/lib/utils/timezone"
@@ -66,6 +66,9 @@ function SettingsContent() {
   })
   const [updateTaxConfig, { isLoading: isUpdatingTax }] = useUpdateTaxConfigMutation()
 
+  // Password change API hook
+  const [changePassword, { isLoading: isChangingPassword }] = useChangePasswordMutation()
+
   const [activeTab, setActiveTab] = useState("profile")
 
   // Modal states
@@ -89,7 +92,6 @@ function SettingsContent() {
   const [profile, setProfile] = useState({
     name: user?.name || "",
     email: user?.email || "",
-    company: user?.company || "",
   })
 
   const [password, setPassword] = useState({
@@ -98,13 +100,16 @@ function SettingsContent() {
     confirm: "",
   })
 
+  const [showPassword, setShowPassword] = useState({
+    current: false,
+    new: false,
+    confirm: false,
+  })
+
   const [settings, setSettings] = useState({
     lowStockThreshold: 10,
     currency: "USD",
     timezone: "UTC",
-    darkMode: false,
-    emailNotifications: true,
-    weeklyReports: true,
   })
 
   // Tax configuration state
@@ -147,9 +152,6 @@ function SettingsContent() {
         lowStockThreshold: userSettingsData.data.preferences.lowStockThreshold || 10,
         currency: userSettingsData.data.preferences.currency || "USD",
         timezone: userSettingsData.data.preferences.timezone || getUserTimezone(),
-        darkMode: userSettingsData.data.preferences.darkMode || false,
-        emailNotifications: userSettingsData.data.preferences.emailNotifications !== false,
-        weeklyReports: userSettingsData.data.preferences.weeklyReports !== false,
       })
       setSelectedBaseCurrency(userSettingsData.data.preferences.currency || "USD")
     }
@@ -161,7 +163,6 @@ function SettingsContent() {
       setProfile({
         name: userSettingsData.data.profile.name || user?.name || "",
         email: userSettingsData.data.profile.email || user?.email || "",
-        company: userSettingsData.data.profile.company || user?.company || "",
       })
     }
   }, [userSettingsData, user])
@@ -242,13 +243,11 @@ function SettingsContent() {
     const originalProfile = {
       name: user?.name || "",
       email: user?.email || "",
-      company: user?.company || "",
     }
     
     const changedFields = []
     if (originalProfile.name !== profile.name) changedFields.push('name')
     if (originalProfile.email !== profile.email) changedFields.push('email')
-    if (originalProfile.company !== profile.company) changedFields.push('company')
     
     try {
       // Save to database
@@ -284,27 +283,61 @@ function SettingsContent() {
   }
 
   const handleChangePassword = async () => {
-    if (password.new !== password.confirm) {
-      toast.error("Passwords do not match")
+    // Validation
+    if (!password.current.trim()) {
+      toast.error("Current password is required")
       return
     }
     
-    await logMovement({
-      eventType: "settings.changed",
-      eventTitle: "Password Changed",
-      description: "User changed their password",
-      userId: user?.id || "system",
-      userName: user?.name || "System",
-      userEmail: user?.email,
-      metadata: {
-        section: "security",
-        action: "password_change",
-      },
-    })
+    if (!password.new.trim()) {
+      toast.error("New password is required")
+      return
+    }
     
-    toast.success("Password changed successfully")
-    console.log("[v0] Password changed")
-    setPassword({ current: "", new: "", confirm: "" })
+    if (password.new.length < 6) {
+      toast.error("New password must be at least 6 characters")
+      return
+    }
+    
+    if (password.new !== password.confirm) {
+      toast.error("New passwords do not match")
+      return
+    }
+    
+    if (password.current === password.new) {
+      toast.error("New password must be different from current password")
+      return
+    }
+    
+    try {
+      // Call the API to change password
+      await changePassword({
+        currentPassword: password.current,
+        newPassword: password.new,
+      }).unwrap()
+      
+      // Log the password change activity
+      await logMovement({
+        eventType: "settings.changed",
+        eventTitle: "Password Changed",
+        description: "User changed their password",
+        userId: user?.id || "system",
+        userName: user?.name || "System",
+        userEmail: user?.email,
+        metadata: {
+          section: "security",
+          action: "password_change",
+        },
+      })
+      
+      toast.success("Password changed successfully")
+      // Clear the form
+      setPassword({ current: "", new: "", confirm: "" })
+    } catch (error: any) {
+      console.error("Password change error:", error)
+      const errorMessage = error?.data?.error || error?.message || "Failed to change password"
+      toast.error(errorMessage)
+    }
   }
 
   const handleSaveSettings = async () => {
@@ -312,18 +345,12 @@ function SettingsContent() {
       lowStockThreshold: 10,
       currency: "USD",
       timezone: "UTC",
-      darkMode: false,
-      emailNotifications: true,
-      weeklyReports: true,
     }
     
     const changedFields = []
     if (originalSettings.lowStockThreshold !== settings.lowStockThreshold) changedFields.push('low stock threshold')
     if (originalSettings.currency !== settings.currency) changedFields.push('currency')
     if (originalSettings.timezone !== settings.timezone) changedFields.push('timezone')
-    if (originalSettings.darkMode !== settings.darkMode) changedFields.push('dark mode')
-    if (originalSettings.emailNotifications !== settings.emailNotifications) changedFields.push('email notifications')
-    if (originalSettings.weeklyReports !== settings.weeklyReports) changedFields.push('weekly reports')
     
     try {
       // Save to database
@@ -895,15 +922,6 @@ function SettingsContent() {
                         placeholder="john@example.com"
                       />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">Company Name</label>
-                      <Input
-                        name="company"
-                        value={profile.company}
-                        onChange={handleProfileChange}
-                        placeholder="Your Company"
-                      />
-                    </div>
                   </div>
                   <Button onClick={handleSaveProfile} className="mt-6">
                     Save Changes
@@ -919,37 +937,77 @@ function SettingsContent() {
                   <div className="space-y-4 max-w-md">
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">Current Password</label>
-                      <Input
-                        type="password"
-                        name="current"
-                        value={password.current}
-                        onChange={handlePasswordChange}
-                        placeholder="••••••••"
-                      />
+                      <div className="relative">
+                        <Input
+                          type={showPassword.current ? "text" : "password"}
+                          name="current"
+                          value={password.current}
+                          onChange={handlePasswordChange}
+                          placeholder="••••••••"
+                          className="pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword((prev) => ({ ...prev, current: !prev.current }))}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                          aria-label={showPassword.current ? "Hide password" : "Show password"}
+                        >
+                          {showPassword.current ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">New Password</label>
-                      <Input
-                        type="password"
-                        name="new"
-                        value={password.new}
-                        onChange={handlePasswordChange}
-                        placeholder="••••••••"
-                      />
+                      <div className="relative">
+                        <Input
+                          type={showPassword.new ? "text" : "password"}
+                          name="new"
+                          value={password.new}
+                          onChange={handlePasswordChange}
+                          placeholder="••••••••"
+                          className="pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword((prev) => ({ ...prev, new: !prev.new }))}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                          aria-label={showPassword.new ? "Hide password" : "Show password"}
+                        >
+                          {showPassword.new ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-2">Confirm Password</label>
-                      <Input
-                        type="password"
-                        name="confirm"
-                        value={password.confirm}
-                        onChange={handlePasswordChange}
-                        placeholder="••••••••"
-                      />
+                      <div className="relative">
+                        <Input
+                          type={showPassword.confirm ? "text" : "password"}
+                          name="confirm"
+                          value={password.confirm}
+                          onChange={handlePasswordChange}
+                          placeholder="••••••••"
+                          className="pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword((prev) => ({ ...prev, confirm: !prev.confirm }))}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                          aria-label={showPassword.confirm ? "Hide password" : "Show password"}
+                        >
+                          {showPassword.confirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <Button onClick={handleChangePassword} className="mt-6">
-                    Update Password
+                  <Button onClick={handleChangePassword} disabled={isChangingPassword} className="mt-6">
+                    {isChangingPassword ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Updating Password...
+                      </>
+                    ) : (
+                      "Update Password"
+                    )}
                   </Button>
                 </div>
               </div>
@@ -957,6 +1015,13 @@ function SettingsContent() {
 
             {activeTab === "preferences" && (
               <div className="bg-card border border-border rounded-lg p-6 space-y-6">
+                {/* Development Notice */}
+                <div className="bg-black-50 dark:bg-black-900/20 border border-black-200 dark:border-black-800 rounded-lg p-4">
+                  <p className="text-sm text-black-800 dark:text-black-200">
+                    <strong>Note:</strong> This section is currently under development and is not functional yet.
+                  </p>
+                </div>
+
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold text-foreground">App Preferences</h2>
@@ -1030,47 +1095,6 @@ function SettingsContent() {
                         onChange={(e) => handleSettingChange("lowStockThreshold", Number.parseInt(e.target.value))}
                       />
                       <p className="text-xs text-muted-foreground mt-1">Units below this will trigger alerts</p>
-                    </div>
-
-                    <div className="border-t border-border pt-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-foreground">Dark Mode</p>
-                          <p className="text-xs text-muted-foreground">Use dark monochrome theme</p>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={settings.darkMode}
-                          onChange={(e) => handleSettingChange("darkMode", e.target.checked)}
-                          className="w-4 h-4 rounded border border-border"
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-foreground">Email Notifications</p>
-                          <p className="text-xs text-muted-foreground">Receive alerts for low stock</p>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={settings.emailNotifications}
-                          onChange={(e) => handleSettingChange("emailNotifications", e.target.checked)}
-                          className="w-4 h-4 rounded border border-border"
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-foreground">Weekly Reports</p>
-                          <p className="text-xs text-muted-foreground">Get weekly inventory summary</p>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={settings.weeklyReports}
-                          onChange={(e) => handleSettingChange("weeklyReports", e.target.checked)}
-                          className="w-4 h-4 rounded border border-border"
-                        />
-                      </div>
                     </div>
                   </div>
 
