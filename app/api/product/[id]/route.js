@@ -15,10 +15,19 @@ export async function GET(request, { params }) {
     const { error, userId } = requireAuth(request);
     if (error) return error;
     
+    // Check if user is admin
+    const userRole = request.headers.get('X-User-Role');
+    const isAdmin = userRole === 'admin';
+    
     const { id } = await params;
-    const product = await Product.findOne({ _id: id, userId })
+    
+    // Build query - if admin, get product regardless of owner; otherwise, only user's product
+    let query = isAdmin ? { _id: id } : { _id: id, userId };
+    
+    const product = await Product.findOne(query)
       .populate("category", "name description")
-      .populate("unitType", "name abbreviation");
+      .populate("unitType", "name abbreviation")
+      .populate("userId", "name email company");
     
     if (!product) {
       return NextResponse.json(
