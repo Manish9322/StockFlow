@@ -208,7 +208,7 @@ function AdminTaxManagementContent() {
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Tax Management</h1>
             <p className="text-sm md:text-base text-muted-foreground">
-              Configure global tax settings for all users
+              Configure global tax settings for all users and manage other taxes separately here
             </p>
           </div>
           <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -218,13 +218,13 @@ function AdminTaxManagementContent() {
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
+          <div className="flex items-center justify-center py-12 mb-4">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
           <div className="space-y-6">
             {/* GST Configuration */}
-            <div className="bg-card border border-border rounded-lg p-6 space-y-4">
+            <div className="bg-card border border-border rounded-lg p-6 space-y-4 mb-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-base font-semibold text-foreground">GST (Goods and Services Tax)</h3>
@@ -299,7 +299,7 @@ function AdminTaxManagementContent() {
             </div>
 
             {/* Platform Fee Configuration */}
-            <div className="bg-card border border-border rounded-lg p-6 space-y-4">
+            <div className="bg-card border border-border rounded-lg p-6 space-y-4 mb-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-base font-semibold text-foreground">Platform Fee</h3>

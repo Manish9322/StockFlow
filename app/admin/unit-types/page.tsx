@@ -167,25 +167,25 @@ function AdminUnitTypesContent() {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Unit Types</h1>
           <p className="text-sm md:text-base text-muted-foreground">
-            Manage measurement units
+            Manage measurement units and their abbreviations used across the inventory system.
           </p>
         </div>
 
         {/* Statistics Card */}
         {isLoading ? (
-          <div className="bg-card border border-border rounded-lg p-4 md:p-6 animate-pulse">
+          <div className="bg-card border border-border rounded-lg p-4 md:p-6 mb-4 animate-pulse">
             <div className="h-4 bg-muted rounded w-32 mb-2"></div>
             <div className="h-8 bg-muted rounded w-16"></div>
           </div>
         ) : (
-          <div className="bg-card border border-border rounded-lg p-4 md:p-6">
+          <div className="bg-card border border-border rounded-lg p-4 md:p-6 mb-4">
             <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Total Unit Types</p>
             <p className="text-2xl md:text-2xl font-semibold text-foreground">{filteredUnitTypes.length}</p>
           </div>
         )}
 
         {/* Search and Add */}
-        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4 md:space-y-6">
+        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4 mb-4 md:space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-foreground">Manage Unit Types</h2>
             <div className="flex gap-2">

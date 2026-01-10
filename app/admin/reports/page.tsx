@@ -459,12 +459,12 @@ export default function AdminReports() {
           <div className="mb-6 md:mb-8">
             <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Reports & Analytics</h1>
             <p className="text-sm md:text-base text-muted-foreground">
-              View and analyze data across your inventory system with detailed reports and charts
+              View and analyze data across your inventory system with detailed reports and charts.
             </p>
           </div>
 
           {/* Charts Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
             <div className="border border-border rounded-lg p-4 bg-card">
               <div className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <h3 className="text-sm font-medium text-foreground">Users Growth</h3>
@@ -543,7 +543,7 @@ export default function AdminReports() {
           </div>
 
           {/* Data Cards Section */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-4">
             <div 
               className="border border-border rounded-lg p-4 cursor-pointer hover:bg-accent-foreground bg-card"
               onClick={() => openModal('users')}
@@ -616,7 +616,7 @@ export default function AdminReports() {
           </div>
 
           {/* Export Section */}
-          <Card className="mb-8">
+          <Card className="mb-4 rounded-lg shadow-none">
             <CardHeader>
               <CardTitle>Export Reports</CardTitle>
             </CardHeader>

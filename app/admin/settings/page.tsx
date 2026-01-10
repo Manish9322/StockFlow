@@ -87,13 +87,13 @@ function AdminSettingsContent() {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Admin Settings</h1>
           <p className="text-sm md:text-base text-muted-foreground">
-            System configuration and management
+            System configuration and management options for administration of the application.
           </p>
         </div>
 
         
         {/* System Statistics */}
-        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4 md:space-y-6">
+        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4 md:space-y-6 mb-4">
           <h2 className="text-lg font-semibold text-foreground">System Overview</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             <div className="bg-card border border-border rounded-lg p-4 md:p-6">
@@ -116,7 +116,7 @@ function AdminSettingsContent() {
         </div>
 
         {/* Admin Profile */}
-        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4 md:space-y-6">
+        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4 md:space-y-6 mb-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-foreground">Admin Profile</h2>
             <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -150,7 +150,7 @@ function AdminSettingsContent() {
         </div>
 
         {/* System Configuration */}
-        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4 md:space-y-6">
+        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4 md:space-y-6 mb-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-foreground">System Configuration</h2>
             <p className="text-xs text-muted-foreground">

@@ -256,12 +256,12 @@ function AdminActivitiesContent() {
         <div className="mb-6 md:mb-8">
           <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">System Activities</h1>
           <p className="text-sm md:text-base text-muted-foreground">
-            View and track all important events and changes across all users in the inventory system
+            View and track all important events and changes across all users in the inventory system.
           </p>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-4 mb-4">
           <div className="bg-card border border-border rounded-lg px-5 py-3">
             <div className="flex items-start justify-between">
               <div className="space-y-1">

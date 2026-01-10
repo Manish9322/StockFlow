@@ -207,12 +207,12 @@ function AdminProductsContent() {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">All Products</h1>
           <p className="text-sm md:text-base text-muted-foreground">
-            View and manage all products from all users with comprehensive filtering options
+            View and manage all products from all users with comprehensive filtering options and sorting capabilities.
           </p>
         </div>
 
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="bg-card border border-border rounded-lg p-4 md:p-6 animate-pulse">
                 <div className="h-4 bg-muted rounded w-24 mb-2"></div>

@@ -163,7 +163,7 @@ function AdminCategoriesContent() {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Categories</h1>
           <p className="text-sm md:text-base text-muted-foreground">
-            Manage product categories
+            Manage product categories and their associated products across the inventory system.
           </p>
         </div>
 
@@ -174,14 +174,14 @@ function AdminCategoriesContent() {
             <div className="h-8 bg-muted rounded w-16"></div>
           </div>
         ) : (
-          <div className="bg-card border border-border rounded-lg p-4 md:p-6">
+          <div className="bg-card border border-border rounded-lg p-4 md:p-6 mb-4">
             <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Total Categories</p>
             <p className="text-2xl md:text-2xl font-semibold text-foreground">{totalCategoriesCount}</p>
           </div>
         )}
 
         {/* Search and Add */}
-        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4 md:space-y-6">
+        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4 md:space-y-6 mb-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-foreground">Manage Categories</h2>
             <div className="flex gap-2">

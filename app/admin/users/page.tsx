@@ -184,13 +184,13 @@ function AdminUsersContent() {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">User Management</h1>
           <p className="text-sm md:text-base text-muted-foreground">
-            Manage user accounts and permissions
+            Manage user accounts and permissions across the inventory system.
           </p>
         </div>
 
         {/* Statistics Cards */}
         {usersLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="bg-card border border-border rounded-lg p-4 md:p-6 animate-pulse">
                 <div className="h-4 bg-muted rounded w-24 mb-2"></div>
@@ -199,7 +199,7 @@ function AdminUsersContent() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 mb-4">
             <div className="bg-card border border-border rounded-lg p-4 md:p-6">
               <p className="text-xs text-muted-foreground mb-2 uppercase font-semibold">Total Users</p>
               <p className="text-2xl md:text-2xl font-semibold text-foreground">{totalUsers}</p>
@@ -212,7 +212,7 @@ function AdminUsersContent() {
         )}
 
         {/* Filters */}
-        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4 md:space-y-6">
+        <div className="bg-card border border-border rounded-lg p-4 md:p-6 space-y-4 md:space-y-6 mb-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-foreground">Filter Users</h2>
             <Button
