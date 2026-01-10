@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
-import { Eye, EyeOff, Shield } from "lucide-react"
+import { Eye, EyeOff, Shield, AlertCircle } from "lucide-react"
 
 export default function AdminLogin() {
   const [email, setEmail] = useState("")
@@ -40,74 +40,129 @@ export default function AdminLogin() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
-        <div className="bg-card border border-border rounded-lg p-8 space-y-6">
-          <div className="space-y-2 text-center">
-            <div className="flex justify-center mb-4">
-              <div className="bg-primary/10 p-3 rounded-full">
-                <Shield className="h-8 w-8 text-primary" />
-              </div>
-            </div>
-            <h1 className="text-2xl font-bold text-foreground">Admin Login</h1>
-            <p className="text-sm text-muted-foreground">Sign in to Stock Flow Admin Panel</p>
+        {/* Header Section */}
+        <header className="text-center mb-6">
+          <div className="inline-flex items-center justify-center bg-primary/10 p-4 rounded-full mb-4">
+            <Shield className="h-10 w-10 text-primary" aria-hidden="true" />
           </div>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Admin Login</h1>
+          <p className="text-muted-foreground">Access the Stock Flow Admin Panel</p>
+        </header>
 
+        {/* Main Card */}
+        <main className="bg-card border border-border rounded-lg shadow-sm">
+          {/* Error Alert */}
           {error && (
-            <div className="bg-destructive/10 border border-destructive/20 rounded p-3 text-sm text-destructive">
-              {error}
+            <div
+              role="alert"
+              aria-live="assertive"
+              className="m-6 mb-0 bg-destructive/10 border border-destructive/20 rounded-md p-4 flex items-start gap-3"
+            >
+              <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" aria-hidden="true" />
+              <p className="text-sm text-destructive font-medium">{error}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Admin Email</label>
-              <Input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter admin email"
-                required
-              />
-            </div>
+          {/* Login Form */}
+          <form onSubmit={handleSubmit} className="p-6 space-y-5">
+            <fieldset disabled={loading} className="space-y-5">
+              <legend className="sr-only">Admin Login Credentials</legend>
 
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Admin Password</label>
-              <div className="relative">
+              {/* Email Field */}
+              <div className="space-y-2">
+                <label htmlFor="admin-email" className="block text-sm font-medium text-foreground">
+                  Admin Email
+                </label>
                 <Input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  id="admin-email"
+                  name="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin@stockflow.com"
+                  autoComplete="email"
+                  autoFocus
                   required
-                  className="pr-10"
+                  aria-required="true"
+                  aria-invalid={error ? "true" : "false"}
+                  className="h-11"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
               </div>
-            </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in..." : "Sign In as Admin"}
-            </Button>
+              {/* Password Field */}
+              <div className="space-y-2">
+                <label htmlFor="admin-password" className="block text-sm font-medium text-foreground">
+                  Admin Password
+                </label>
+                <div className="relative">
+                  <Input
+                    id="admin-password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                    required
+                    aria-required="true"
+                    aria-invalid={error ? "true" : "false"}
+                    className="h-11 pr-11"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-sm p-0.5"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    tabIndex={0}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" aria-hidden="true" />
+                    ) : (
+                      <Eye className="h-4 w-4" aria-hidden="true" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <Button
+                type="submit"
+                className="w-full h-11 font-medium"
+                disabled={loading || !email || !password}
+                aria-busy={loading}
+              >
+                {loading ? (
+                  <>
+                    <span className="inline-block animate-spin mr-2" aria-hidden="true">
+                      ⏳
+                    </span>
+                    Signing in...
+                  </>
+                ) : (
+                  "Sign In as Admin"
+                )}
+              </Button>
+            </fieldset>
           </form>
 
-          <div className="pt-4 border-t border-border space-y-2">
-            {/* <p className="text-xs text-muted-foreground text-center">
-              Admin credentials: stockflowadmin@gmail.com / StockFlowAdmin@2025
-            </p> */}
+          {/* Footer Section */}
+          <footer className="px-6 pb-6 pt-4 border-t border-border">
             <p className="text-sm text-center text-muted-foreground">
               Not an admin?{" "}
-              <Link href="/login" className="text-primary hover:underline font-medium">
+              <Link
+                href="/login"
+                className="text-primary hover:underline font-medium focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-sm"
+              >
                 User Login
               </Link>
             </p>
-          </div>
-        </div>
+          </footer>
+        </main>
+
+        {/* Additional Info */}
+        <p className="text-xs text-center text-muted-foreground mt-6">
+          For security purposes, admin access is restricted and monitored.
+        </p>
       </div>
     </div>
   )
