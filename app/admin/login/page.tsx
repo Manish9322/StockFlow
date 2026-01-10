@@ -35,6 +35,8 @@ export default function AdminLogin() {
     }
   }
 
+  // Admin credentials: stockflowadmin@gmail.com / StockFlowAdmin@2025
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
@@ -95,9 +97,9 @@ export default function AdminLogin() {
           </form>
 
           <div className="pt-4 border-t border-border space-y-2">
-            <p className="text-xs text-muted-foreground text-center">
+            {/* <p className="text-xs text-muted-foreground text-center">
               Admin credentials: stockflowadmin@gmail.com / StockFlowAdmin@2025
-            </p>
+            </p> */}
             <p className="text-sm text-center text-muted-foreground">
               Not an admin?{" "}
               <Link href="/login" className="text-primary hover:underline font-medium">

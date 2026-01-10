@@ -2,10 +2,9 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { LayoutDashboard, Plus, RefreshCw, BarChart3, Settings, ShoppingCart, History, Shield, Users, Package, Paperclip, FolderTree, Ruler, Activity, LogOut } from "lucide-react"
+import { LayoutDashboard, Plus, RefreshCw, BarChart3, Settings, ShoppingCart, History, Shield, Users, Package, Paperclip, FolderTree, Ruler, Activity, LogOut, User } from "lucide-react"
 import { useLanguage } from "@/lib/language-context"
 import { useAuth } from "@/lib/auth-context"
-import { useState } from "react"
 
 interface SidebarProps {
   isOpen: boolean
@@ -89,11 +88,46 @@ export default function Sidebar({ isOpen, onNavigate }: SidebarProps) {
         })}
       </nav>
 
-
-      <div className="p-4 border-t border-border text-xs text-muted-foreground shrink-nowrap">
-        <p>© 2025 {sidebarTitle}</p>
+      {/* User Details Section */}
+      <div className="border-t border-border shrink-0">
+        {(isAdminRoute && isAdmin ? adminUser : user) && (
+          <div className="p-4 space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shrink-0">
+                <User size={20} className="text-accent-foreground" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">
+                  {(isAdminRoute && isAdmin ? adminUser?.name : user?.name) || "User"}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {(isAdminRoute && isAdmin ? adminUser?.email : user?.email) || ""}
+                </p>
+              </div>
+            </div>
+            
+            <button
+              onClick={() => {
+                if (isAdminRoute && isAdmin) {
+                  adminLogout()
+                  router.push("/admin/login")
+                } else {
+                  logout()
+                  router.push("/login")
+                }
+              }}
+              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <LogOut size={18} className="shrink-0" />
+              <span>Logout</span>
+            </button>
+          </div>
+        )}
+        
+        <div className="px-4 pb-4 text-xs text-muted-foreground">
+          <p>© {new Date().getFullYear()} {sidebarTitle}</p>
+        </div>
       </div>
-
 
     </aside>
   )
