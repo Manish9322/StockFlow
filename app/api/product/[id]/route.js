@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import _db from "@/lib/utils/db";
 import Product from "@/models/product.model";
+import Category from "@/models/category.model";
+import UnitType from "@/models/unitType.model";
 import Movement from "@/models/movement.model";
 import PriceHistory from "@/models/priceHistory.model";
 import User from "@/models/user.model";
