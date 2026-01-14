@@ -58,7 +58,7 @@ export default function AdminLogin() {
               aria-live="assertive"
               className="m-6 mb-0 bg-destructive/10 border border-destructive/20 rounded-md p-4 flex items-start gap-3"
             >
-              <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" aria-hidden="true" />
+              <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" aria-hidden="true" />
               <p className="text-sm text-destructive font-medium">{error}</p>
             </div>
           )}
